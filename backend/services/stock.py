@@ -47,7 +47,7 @@ US_STOCKS = [
     {"ticker": "AAPL", "name": "애플", "market": "US", "exchange": "NASDAQ", "keywords": ["apple", "아이폰"]},
     {"ticker": "MSFT", "name": "마이크로소프트", "market": "US", "exchange": "NASDAQ", "keywords": ["microsoft", "ms", "마소"]},
     {"ticker": "NVDA", "name": "엔비디아", "market": "US", "exchange": "NASDAQ", "keywords": ["nvidia"]},
-    {"ticker": "GOOGL", "name": "알파벳(구글)", "market": "US", "exchange": "NASDAQ", "keywords": ["google", "구글", "alphabet"]},
+    {"ticker": "GOOGL", "name": "알파벳(구글)", "market": "US", "exchange": "NASDAQ", "keywords": ["google", "구글", "alphabet", "googl"]},
     {"ticker": "AMZN", "name": "아마존", "market": "US", "exchange": "NASDAQ", "keywords": ["amazon"]},
     {"ticker": "META", "name": "메타", "market": "US", "exchange": "NASDAQ", "keywords": ["facebook", "페이스북", "meta"]},
     {"ticker": "TSLA", "name": "테슬라", "market": "US", "exchange": "NASDAQ", "keywords": ["tesla"]},
@@ -124,7 +124,7 @@ async def search_stock(query: str, market: str = "ALL") -> list:
     for s in pool:
         if (query_lower in s["name"].lower()
                 or query_lower in s["ticker"].lower()
-                or any(query_lower in kw for kw in s["keywords"])):
+                or any(query_lower in kw or kw in query_lower for kw in s["keywords"])):
             matched.append(s)
 
     results = []
