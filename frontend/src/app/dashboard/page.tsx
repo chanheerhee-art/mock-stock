@@ -146,7 +146,8 @@ export default function Dashboard() {
                 <YAxis domain={["auto", "auto"]} hide />
                 <Tooltip
                   contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
-                  formatter={(v: number) => [`${v.toLocaleString()}원`, "자산"]}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(v: any) => [`${Number(v).toLocaleString()}원`, "자산"]}
                   labelStyle={{ color: "#9ca3af" }}
                 />
                 <Line

@@ -204,10 +204,8 @@ export default function StockDetailPage() {
                   />
                   <Tooltip
                     contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
-                    formatter={(v: number) => [
-                      isUS ? `$${v.toFixed(2)}` : `${v.toLocaleString()}원`,
-                      "종가"
-                    ]}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(v: any) => [isUS ? `$${Number(v).toFixed(2)}` : `${Number(v).toLocaleString()}원`, "종가"]}
                     labelStyle={{ color: "#9ca3af" }}
                   />
                   {basePrice && (
