@@ -73,7 +73,7 @@ TICKER_MAP = {s["ticker"]: s for s in ALL_STOCKS}
 
 
 async def get_naver_price(ticker: str, market: str, exchange: str, name: str) -> Optional[dict]:
-    """네이버 금융에서 주가 조회"""
+    """네이버 금융에서 주가 조회 (한국 주식 전용)"""
     try:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/basic"
         headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"}
@@ -101,14 +101,49 @@ async def get_naver_price(ticker: str, market: str, exchange: str, name: str) ->
         return None
 
 
+async def get_yahoo_price(ticker: str, market: str, exchange: str, name: str) -> Optional[dict]:
+    """Yahoo Finance API로 미국 주식 주가 조회"""
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
+        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+        result = data["chart"]["result"][0]
+        meta = result["meta"]
+        current_price = meta.get("regularMarketPrice", 0)
+        prev_close = meta.get("previousClose", current_price)
+        change = current_price - prev_close
+        change_pct = (change / prev_close * 100) if prev_close else 0
+
+        return {
+            "ticker": ticker,
+            "name": name,
+            "price": current_price,
+            "change": change,
+            "change_pct": change_pct,
+            "market": market,
+            "exchange": exchange,
+        }
+    except Exception as e:
+        print(f"미국 주가 조회 오류 ({ticker}): {e}")
+        return None
+
+
 async def get_stock_price(ticker: str) -> Optional[dict]:
     """종목 현재가 조회"""
     info = TICKER_MAP.get(ticker)
     if info:
+        if info["market"] == "US":
+            return await get_yahoo_price(ticker, info["market"], info["exchange"], info["name"])
         return await get_naver_price(ticker, info["market"], info["exchange"], info["name"])
     # 직접 입력된 ticker 처리
     is_kr = ticker.isdigit()
-    return await get_naver_price(ticker, "KR" if is_kr else "US", "KOSPI" if is_kr else "US", ticker)
+    if is_kr:
+        return await get_naver_price(ticker, "KR", "KOSPI", ticker)
+    return await get_yahoo_price(ticker, "US", "US", ticker)
 
 
 async def search_stock(query: str, market: str = "ALL") -> list:
@@ -129,7 +164,10 @@ async def search_stock(query: str, market: str = "ALL") -> list:
 
     results = []
     for item in matched[:6]:
-        price_info = await get_naver_price(item["ticker"], item["market"], item["exchange"], item["name"])
+        if item["market"] == "US":
+            price_info = await get_yahoo_price(item["ticker"], item["market"], item["exchange"], item["name"])
+        else:
+            price_info = await get_naver_price(item["ticker"], item["market"], item["exchange"], item["name"])
         if price_info:
             results.append(price_info)
     return results
@@ -145,7 +183,10 @@ async def get_popular_stocks(market: str = "ALL") -> list:
 
     results = []
     for item in pool:
-        price_info = await get_naver_price(item["ticker"], item["market"], item["exchange"], item["name"])
+        if item["market"] == "US":
+            price_info = await get_yahoo_price(item["ticker"], item["market"], item["exchange"], item["name"])
+        else:
+            price_info = await get_naver_price(item["ticker"], item["market"], item["exchange"], item["name"])
         if price_info:
             results.append(price_info)
     return results
