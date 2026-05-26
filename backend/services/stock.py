@@ -1,5 +1,31 @@
 import httpx
+import asyncio
+import time
 from typing import Optional
+
+# ── 인메모리 캐시 ──────────────────────────────────────────
+# { cache_key: (data_dict, expires_at) }
+_price_cache: dict[str, tuple[dict, float]] = {}
+_PRICE_TTL = 90  # 초 (장중 1.5분 캐시)
+# ticker별 개별 락: 같은 ticker 중복 요청만 직렬화, 다른 ticker는 병렬
+_ticker_locks: dict[str, asyncio.Lock] = {}
+
+
+def _get_lock(key: str) -> asyncio.Lock:
+    if key not in _ticker_locks:
+        _ticker_locks[key] = asyncio.Lock()
+    return _ticker_locks[key]
+
+
+def _cache_get(key: str) -> Optional[dict]:
+    entry = _price_cache.get(key)
+    if entry and time.monotonic() < entry[1]:
+        return entry[0]
+    return None
+
+
+def _cache_set(key: str, data: dict):
+    _price_cache[key] = (data, time.monotonic() + _PRICE_TTL)
 
 # 홈화면 인기 종목용 (하드코딩 최소화 - ticker만 유지)
 POPULAR_KR = ["005930", "000660", "035420", "035720", "005380", "373220", "068270", "247540"]
@@ -106,70 +132,92 @@ US_NAME_KO: dict[str, str] = {
 # ── 가격 조회 ──────────────────────────────────────────────
 
 async def get_naver_price(ticker: str) -> Optional[dict]:
-    """네이버 금융 API로 한국 주식 가격 조회"""
-    try:
-        url = f"https://m.stock.naver.com/api/stock/{ticker}/basic"
-        headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"}
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+    """네이버 금융 API로 한국 주식 가격 조회 (캐시 90초)"""
+    cached = _cache_get(ticker)
+    if cached:
+        return cached
 
-        exchange_type = data.get("stockExchangeType", {})
-        exchange_code = exchange_type.get("code", "KS")
-        # Naver API: KOSPI = "KS", KOSDAQ = "KQ"
-        exchange = "KOSDAQ" if exchange_code == "KQ" else "KOSPI"
+    async with _get_lock(ticker):
+        # lock 획득 후 재확인 (다른 코루틴이 이미 채웠을 수 있음)
+        cached = _cache_get(ticker)
+        if cached:
+            return cached
 
-        return {
-            "ticker": ticker,
-            "name": data.get("stockName", ticker),
-            "price": float(data.get("closePrice", "0").replace(",", "")),
-            "change": float(data.get("compareToPreviousClosePrice", "0").replace(",", "")),
-            "change_pct": float(data.get("fluctuationsRatio", "0")),
-            "market": "KR",
-            "exchange": exchange,
-        }
-    except Exception as e:
-        print(f"KR 주가 조회 오류 ({ticker}): {e}")
-        return None
+        try:
+            url = f"https://m.stock.naver.com/api/stock/{ticker}/basic"
+            headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"}
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+
+            exchange_type = data.get("stockExchangeType", {})
+            exchange_code = exchange_type.get("code", "KS")
+            exchange = "KOSDAQ" if exchange_code == "KQ" else "KOSPI"
+
+            result = {
+                "ticker": ticker,
+                "name": data.get("stockName", ticker),
+                "price": float(data.get("closePrice", "0").replace(",", "")),
+                "change": float(data.get("compareToPreviousClosePrice", "0").replace(",", "")),
+                "change_pct": float(data.get("fluctuationsRatio", "0")),
+                "market": "KR",
+                "exchange": exchange,
+            }
+            _cache_set(ticker, result)
+            return result
+        except Exception as e:
+            print(f"KR 주가 조회 오류 ({ticker}): {e}")
+            return None
 
 
 async def get_yahoo_price(ticker: str) -> Optional[dict]:
-    """Yahoo Finance API로 미국 주식 가격 조회"""
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
-        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+    """Yahoo Finance API로 미국 주식 가격 조회 (캐시 90초)"""
+    cache_key = f"us:{ticker}"
+    cached = _cache_get(cache_key)
+    if cached:
+        return cached
 
-        meta = data["chart"]["result"][0]["meta"]
-        current_price = meta.get("regularMarketPrice", 0)
-        prev_close = meta.get("chartPreviousClose") or meta.get("previousClose") or current_price
-        change = current_price - prev_close
-        change_pct = (change / prev_close * 100) if prev_close else 0
+    async with _get_lock(cache_key):
+        cached = _cache_get(cache_key)
+        if cached:
+            return cached
 
-        exchange = meta.get("fullExchangeName", "NYSE")
-        # ETF 거래소 통일
-        if meta.get("quoteType") == "ETF":
-            exchange = "ETF"
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d"
+            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
 
-        eng_name = meta.get("longName") or meta.get("shortName", ticker)
-        name = US_NAME_KO.get(ticker.upper(), eng_name)
+            meta = data["chart"]["result"][0]["meta"]
+            current_price = meta.get("regularMarketPrice", 0)
+            prev_close = meta.get("chartPreviousClose") or meta.get("previousClose") or current_price
+            change = current_price - prev_close
+            change_pct = (change / prev_close * 100) if prev_close else 0
 
-        return {
-            "ticker": ticker,
-            "name": name,
-            "price": current_price,
-            "change": change,
-            "change_pct": change_pct,
-            "market": "US",
-            "exchange": exchange,
-        }
-    except Exception as e:
-        print(f"US 주가 조회 오류 ({ticker}): {e}")
-        return None
+            exchange = meta.get("fullExchangeName", "NYSE")
+            if meta.get("quoteType") == "ETF":
+                exchange = "ETF"
+
+            eng_name = meta.get("longName") or meta.get("shortName", ticker)
+            name = US_NAME_KO.get(ticker.upper(), eng_name)
+
+            result = {
+                "ticker": ticker,
+                "name": name,
+                "price": current_price,
+                "change": change,
+                "change_pct": change_pct,
+                "market": "US",
+                "exchange": exchange,
+            }
+            _cache_set(cache_key, result)
+            return result
+        except Exception as e:
+            print(f"US 주가 조회 오류 ({ticker}): {e}")
+            return None
 
 
 async def get_stock_price(ticker: str) -> Optional[dict]:
