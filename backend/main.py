@@ -9,6 +9,7 @@ import pytz
 from models.database import init_db
 from routers import auth, trade, portfolio, ranking, stock, season, short
 from routers.snapshot import save_daily_snapshots
+from services.order_engine import order_engine_loop
 
 KST = pytz.timezone("Asia/Seoul")
 scheduler = AsyncIOScheduler(timezone=KST)
@@ -31,6 +32,7 @@ async def daily_snapshot():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     await init_db()
 
     # 매월 1일 00:00 KST 시즌 리셋
@@ -40,7 +42,13 @@ async def lifespan(app: FastAPI):
 
     scheduler.start()
     print("스케줄러 시작됨!")
+
+    # 지정가 주문 체결 엔진 (백그라운드 태스크)
+    engine_task = asyncio.create_task(order_engine_loop())
+
     yield
+
+    engine_task.cancel()
     scheduler.shutdown()
 
 

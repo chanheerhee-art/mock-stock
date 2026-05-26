@@ -50,6 +50,19 @@ interface MarketStatus {
   US: MarketStatusInfo;
 }
 
+interface PendingOrder {
+  id: number;
+  ticker: string;
+  name: string;
+  market: string;
+  exchange: string;
+  trade_type: "BUY" | "SELL";
+  quantity: number;
+  limit_price: number;
+  reserved_cash: number;
+  created_at: string;
+}
+
 type MainTab = "TRADE" | "SHORT";
 type TradeType = "BUY" | "SELL";
 type OrderType = "MARKET" | "LIMIT";
@@ -120,10 +133,11 @@ interface TradeSheetProps {
   marketStatus: MarketStatusInfo | null;
   onClose: () => void;
   onTradeSuccess: (updatedInfo: PortfolioInfo) => void;
+  onOrdersChange: () => void;
   onToast: (msg: string, type: "success" | "error") => void;
 }
 
-function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, onClose, onTradeSuccess, onToast }: TradeSheetProps) {
+function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, onClose, onTradeSuccess, onOrdersChange, onToast }: TradeSheetProps) {
   const [tradeType, setTradeType] = useState<TradeType>("BUY");
   const [orderType, setOrderType] = useState<OrderType>("MARKET");
   const [quantity, setQuantity] = useState(1);
@@ -174,14 +188,20 @@ function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, 
       if (orderType === "LIMIT") body.limit_price = limitPrice;
       const res = await api.post(endpoint, body);
 
-      // 거래 성공 → 포트폴리오 즉시 갱신
+      const isPending = res.data.order_type === "pending";
+
+      // 포트폴리오 즉시 갱신 (시장가 체결 또는 매수 예약금 차감 반영)
       const portfolioRes = await api.get("/portfolio/me");
       const updated: PortfolioInfo = portfolioRes.data;
-      setMyInfo(updated);          // 로컬 즉시 반영
-      onTradeSuccess(updated);     // 부모도 동기화
+      setMyInfo(updated);
+      onTradeSuccess(updated);
+
+      // 미체결 주문 목록도 갱신
+      if (isPending) onOrdersChange();
 
       onToast(res.data.message, "success");
       setQuantity(1);
+      if (isPending) setOrderType("MARKET"); // 지정가 → 시장가로 초기화
     } catch (e: any) {
       onToast(e.response?.data?.detail || "거래 실패", "error");
     } finally { setLoading(false); }
@@ -508,6 +528,10 @@ export default function TradePage() {
   const [shortStocks, setShortStocks] = useState<StockInfo[]>([]);
   const [shortQuery, setShortQuery] = useState("");
 
+  // 미체결 주문
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+
   // Toast 상태
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -538,6 +562,22 @@ export default function TradePage() {
     try { const res = await api.get("/short/positions"); setShortPositions(res.data); } catch {}
   }, []);
 
+  const fetchPendingOrders = useCallback(async () => {
+    try { const res = await api.get("/trade/orders"); setPendingOrders(res.data); } catch {}
+  }, []);
+
+  const handleCancelOrder = async (orderId: number) => {
+    setCancellingId(orderId);
+    try {
+      await api.delete(`/trade/orders/${orderId}`);
+      showToast("주문이 취소되었습니다", "success");
+      fetchPendingOrders();
+      fetchMyInfo(); // 예약금 환불 반영
+    } catch (e: any) {
+      showToast(e.response?.data?.detail || "취소 실패", "error");
+    } finally { setCancellingId(null); }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.replace("/"); return; }
@@ -545,9 +585,12 @@ export default function TradePage() {
     api.get("/stock/exchange-rate").then((res) => setUsdKrw(res.data.usd_krw)).catch(() => {});
     fetchMarketStatus();
     fetchShortPositions();
+    fetchPendingOrders();
     const interval = setInterval(fetchMarketStatus, 60_000);
-    return () => clearInterval(interval);
-  }, [router, fetchMarketStatus, fetchMyInfo, fetchShortPositions]);
+    // 30초마다 미체결 주문 갱신 (체결 여부 확인)
+    const orderInterval = setInterval(() => { fetchPendingOrders(); fetchMyInfo(); }, 30_000);
+    return () => { clearInterval(interval); clearInterval(orderInterval); };
+  }, [router, fetchMarketStatus, fetchMyInfo, fetchShortPositions, fetchPendingOrders]);
 
   useEffect(() => {
     setPopularLoading(true);
@@ -661,6 +704,41 @@ export default function TradePage() {
               />
               <button onClick={handleSearch} className="bg-yellow-400 text-gray-900 px-5 rounded-xl font-bold text-sm hover:bg-yellow-300 transition-colors">검색</button>
             </div>
+
+            {/* 미체결 주문 목록 */}
+            {pendingOrders.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 mb-2 font-medium">⏳ 미체결 주문 ({pendingOrders.length}건)</p>
+                <div className="space-y-2">
+                  {pendingOrders.map((o) => (
+                    <div key={o.id} className="bg-gray-800 border border-yellow-500/20 rounded-2xl px-4 py-3 flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                            o.trade_type === "BUY" ? "bg-red-500/20 text-red-400" : "bg-blue-500/20 text-blue-400"
+                          }`}>{o.trade_type === "BUY" ? "매수" : "매도"}</span>
+                          <span className="text-sm font-semibold text-white">{o.name}</span>
+                          <span className="text-xs text-gray-500">{o.quantity}주</span>
+                        </div>
+                        <div className="text-xs text-yellow-400 mt-0.5 font-medium">
+                          지정가 {o.limit_price.toLocaleString()}원
+                        </div>
+                        {o.trade_type === "BUY" && o.reserved_cash > 0 && (
+                          <div className="text-xs text-gray-600 mt-0.5">예약금 {o.reserved_cash.toLocaleString()}원 대기 중</div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleCancelOrder(o.id)}
+                        disabled={cancellingId === o.id}
+                        className="text-xs text-gray-400 hover:text-red-400 border border-gray-600 hover:border-red-400/50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                      >
+                        {cancellingId === o.id ? "취소 중…" : "취소"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="text-xs text-gray-500 mb-2 font-medium">
@@ -803,6 +881,7 @@ export default function TradePage() {
           marketStatus={currentMarketStatus}
           onClose={() => setSelected(null)}
           onTradeSuccess={(updated) => setMyInfo(updated)}
+          onOrdersChange={fetchPendingOrders}
           onToast={showToast}
         />
       )}

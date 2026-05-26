@@ -606,3 +606,43 @@ INFO:     Started server process [9269]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 Run time of job "daily_snapshot (trigger: cron[hour='18', minute='5'], next run at: 2026-05-27 18:05:00 KST)" was missed by 0:12:02.414535
+WARNING:  WatchFiles detected changes in 'models/database.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [9269]
+INFO:     Started server process [42902]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/trade.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [42902]
+INFO:     Started server process [43070]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/order_engine.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [43070]
+INFO:     Started server process [43141]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [43141]
+INFO:     Started server process [43161]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [43161]
+INFO:     Started server process [43183]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

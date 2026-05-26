@@ -121,6 +121,31 @@ class ShortPosition(Base):
     closed_at = Column(DateTime, nullable=True)
 
 
+class OrderStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    FILLED = "FILLED"
+    CANCELLED = "CANCELLED"
+
+
+class PendingOrder(Base):
+    """미체결 지정가 주문"""
+    __tablename__ = "pending_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    ticker = Column(String)
+    name = Column(String)
+    market = Column(String)
+    exchange = Column(String, nullable=True)
+    trade_type = Column(Enum(TradeType))      # BUY / SELL
+    quantity = Column(Integer)
+    limit_price = Column(Float)               # 지정가 (원화 기준)
+    reserved_cash = Column(Float, default=0)  # 매수 주문 시 예약된 현금
+    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    filled_at = Column(DateTime, nullable=True)
+
+
 class AssetSnapshot(Base):
     """일별 자산 스냅샷 (자산 히스토리 그래프용)"""
     __tablename__ = "asset_snapshots"
