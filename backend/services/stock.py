@@ -34,6 +34,7 @@ KR_STOCKS = [
     {"ticker": "012330", "name": "현대모비스", "market": "KR", "exchange": "KOSPI", "keywords": ["모비스", "현대모비스"]},
     {"ticker": "207940", "name": "삼성바이오로직스", "market": "KR", "exchange": "KOSPI", "keywords": ["삼성바이오", "바이오로직스"]},
     {"ticker": "006800", "name": "미래에셋증권", "market": "KR", "exchange": "KOSPI", "keywords": ["미래에셋"]},
+    {"ticker": "100790", "name": "미래에셋벤처투자", "market": "KR", "exchange": "KOSDAQ", "keywords": ["미래에셋", "미래에셋벤처", "벤처투자"]},
     {"ticker": "041510", "name": "에스엠", "market": "KR", "exchange": "KOSDAQ", "keywords": ["sm", "에스엠엔터"]},
     {"ticker": "035900", "name": "JYP Ent.", "market": "KR", "exchange": "KOSDAQ", "keywords": ["jyp", "제이와이피"]},
     {"ticker": "122870", "name": "와이지엔터테인먼트", "market": "KR", "exchange": "KOSDAQ", "keywords": ["yg", "와이지"]},
@@ -114,7 +115,8 @@ async def get_yahoo_price(ticker: str, market: str, exchange: str, name: str) ->
         result = data["chart"]["result"][0]
         meta = result["meta"]
         current_price = meta.get("regularMarketPrice", 0)
-        prev_close = meta.get("previousClose", current_price)
+        # Yahoo Finance v8 API는 chartPreviousClose 필드 사용 (previousClose는 없음)
+        prev_close = meta.get("chartPreviousClose") or meta.get("previousClose") or current_price
         change = current_price - prev_close
         change_pct = (change / prev_close * 100) if prev_close else 0
 
