@@ -17,9 +17,11 @@ export default function Home() {
   }, [router]);
 
   const handleKakaoLogin = () => {
-    api.get("/auth/kakao/url").then((res) => {
-      window.location.href = res.data.url;
-    });
+    // 직접 카카오 로그인 URL로 이동 (API 호출 없이)
+    const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+    const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
+    const url = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${redirectUri}&response_type=code`;
+    window.location.href = url;
   };
 
   if (loading) return null;
