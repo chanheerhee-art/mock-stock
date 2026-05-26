@@ -76,6 +76,7 @@ export default function TradePage() {
   const [popularLoading, setPopularLoading] = useState(true);
   const [myInfo, setMyInfo] = useState<PortfolioInfo | null>(null);
   const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
+  const [usdKrw, setUsdKrw] = useState<number | null>(null);
 
   // 현재 선택된 종목의 시장 장 상태
   const currentMarketStatus: MarketStatusInfo | null = selected
@@ -96,6 +97,7 @@ export default function TradePage() {
     if (!token) { router.replace("/"); return; }
 
     api.get("/portfolio/me").then((res) => setMyInfo(res.data)).catch(() => {});
+    api.get("/stock/exchange-rate").then((res) => setUsdKrw(res.data.usd_krw)).catch(() => {});
     fetchMarketStatus();
 
     // 1분마다 장 상태 갱신
@@ -255,8 +257,11 @@ export default function TradePage() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold text-white">
-                      {s.price.toLocaleString()}{s.market === "KR" ? "원" : "$"}
+                      {s.market === "US" ? `$${s.price.toFixed(2)}` : `${s.price.toLocaleString()}원`}
                     </div>
+                    {s.market === "US" && usdKrw && (
+                      <div className="text-xs text-gray-500">≈ {(s.price * usdKrw).toLocaleString()}원</div>
+                    )}
                     <div className={`text-xs font-semibold mt-0.5 ${s.change_pct >= 0 ? "text-red-400" : "text-blue-400"}`}>
                       {s.change_pct >= 0 ? "▲" : "▼"} {Math.abs(s.change_pct).toFixed(2)}%
                     </div>
@@ -367,11 +372,23 @@ export default function TradePage() {
             >+</button>
           </div>
 
-          <div className="bg-gray-700/50 rounded-xl px-4 py-3 flex justify-between items-center">
-            <span className="text-gray-400 text-sm">예상 금액</span>
-            <span className="text-white font-bold">
-              {(selected.price * quantity).toLocaleString()}{selected.market === "KR" ? "원" : "$"}
-            </span>
+          <div className="bg-gray-700/50 rounded-xl px-4 py-3 space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">예상 금액</span>
+              <span className="text-white font-bold">
+                {selected.market === "US"
+                  ? `$${(selected.price * quantity).toFixed(2)}`
+                  : `${(selected.price * quantity).toLocaleString()}원`}
+              </span>
+            </div>
+            {selected.market === "US" && usdKrw && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-xs">원화 환산 (₩{usdKrw.toLocaleString()})</span>
+                <span className="text-gray-300 text-sm font-semibold">
+                  ≈ {(selected.price * usdKrw * quantity).toLocaleString()}원
+                </span>
+              </div>
+            )}
           </div>
 
           {message && (
