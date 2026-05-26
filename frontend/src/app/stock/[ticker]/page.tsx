@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -73,10 +73,10 @@ export default function StockDetailPage() {
   const [tradeType, setTradeType] = useState<TradeType>("BUY");
   const [quantity, setQuantity] = useState(1);
   const [tradeLoading, setTradeLoading] = useState(false);
-  const [tradeMessage, setTradeMessage] = useState("");
-  const [tradeMessageType, setTradeMessageType] = useState<"success" | "error">("success");
   const [myInfo, setMyInfo] = useState<PortfolioInfo | null>(null);
   const [marketStatus, setMarketStatus] = useState<MarketStatusInfo | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isUS = stock?.market === "US";
   const isTradeAllowed = marketStatus?.is_open ?? false;
@@ -139,18 +139,25 @@ export default function StockDetailPage() {
     }
   };
 
+  const showToast = useCallback((message: string, type: "success" | "error") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
   const handleTrade = async () => {
     if (!stock) return;
-    setTradeLoading(true); setTradeMessage("");
+    setTradeLoading(true);
     try {
       const endpoint = tradeType === "BUY" ? "/trade/buy" : "/trade/sell";
       const res = await api.post(endpoint, { ticker: stock.ticker, quantity, market: stock.market });
-      setTradeMessage(res.data.message);
-      setTradeMessageType("success");
-      fetchMyInfo();
+      // 즉시 반영
+      const portfolioRes = await api.get("/portfolio/me");
+      setMyInfo(portfolioRes.data);
+      setQuantity(1);
+      showToast(res.data.message, "success");
     } catch (e: any) {
-      setTradeMessage(e.response?.data?.detail || "거래 실패");
-      setTradeMessageType("error");
+      showToast(e.response?.data?.detail || "거래 실패", "error");
     } finally { setTradeLoading(false); }
   };
 
@@ -181,6 +188,17 @@ export default function StockDetailPage() {
 
   return (
     <>
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-6 left-1/2 z-[100] -translate-x-1/2 px-5 py-3 rounded-2xl text-sm font-semibold shadow-xl border ${
+            toast.type === "success" ? "bg-green-500/90 text-white border-green-400/50" : "bg-red-500/90 text-white border-red-400/50"
+          }`}
+          style={{ animation: "fadeInDown 0.2s ease-out", maxWidth: "90vw", textAlign: "center" }}
+        >
+          {toast.type === "success" ? "✅ " : "❌ "}{toast.message}
+        </div>
+      )}
       <main
         className="max-w-md mx-auto px-4 py-6 space-y-5"
         style={{ background: "#0f0f0f", minHeight: "100vh", paddingBottom: showTrade ? "420px" : "24px" }}
@@ -315,7 +333,7 @@ export default function StockDetailPage() {
 
         {/* 거래 버튼 */}
         <button
-          onClick={() => { setShowTrade(true); setTradeMessage(""); setQuantity(1); }}
+          onClick={() => { (document.activeElement as HTMLElement)?.blur(); setTimeout(() => { setShowTrade(true); setQuantity(1); }, 80); }}
           className="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold py-4 rounded-2xl text-sm active:scale-95 transition-all"
         >
           💹 {stock.name} 거래하기
@@ -381,11 +399,11 @@ export default function StockDetailPage() {
 
               {/* 매수/매도 탭 */}
               <div className="flex gap-2">
-                <button onClick={() => { setTradeType("BUY"); setQuantity(1); setTradeMessage(""); }}
+                <button onClick={() => { setTradeType("BUY"); setQuantity(1); setQuantity(1); }}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "BUY" ? "bg-red-500 text-white" : "bg-gray-700 text-gray-400"}`}>
                   매수
                 </button>
-                <button onClick={() => { setTradeType("SELL"); setQuantity(1); setTradeMessage(""); }}
+                <button onClick={() => { setTradeType("SELL"); setQuantity(1); setQuantity(1); }}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "SELL" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-400"}`}>
                   매도
                 </button>
@@ -435,13 +453,6 @@ export default function StockDetailPage() {
                 )}
               </div>
 
-              {/* 메시지 */}
-              {tradeMessage && (
-                <div className={`text-sm text-center py-2.5 rounded-xl font-medium ${
-                  tradeMessageType === "success" ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
-                }`}>{tradeMessage}</div>
-              )}
-
               {/* 거래 버튼 */}
               <button onClick={handleTrade} disabled={tradeLoading || !isTradeAllowed}
                 className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
@@ -458,8 +469,12 @@ export default function StockDetailPage() {
 
       <style>{`
         @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeInDown {
+          from { transform: translate(-50%, -16px); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
         }
       `}</style>
     </>

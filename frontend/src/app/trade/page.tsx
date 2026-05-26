@@ -32,8 +32,6 @@ interface ShortPosition {
   margin: number;
   profit: number;
   profit_pct: number;
-  current_price_raw: number;
-  is_us: boolean;
 }
 
 interface MarketStatusInfo {
@@ -65,6 +63,25 @@ const EXCHANGE_BADGE: Record<string, string> = {
   ETF: "bg-yellow-500/20 text-yellow-400",
 };
 
+// ── Toast 알림 ─────────────────────────────────────────────
+
+interface ToastProps { message: string; type: "success" | "error"; }
+
+function Toast({ message, type }: ToastProps) {
+  return (
+    <div
+      className={`fixed top-6 left-1/2 z-[100] -translate-x-1/2 px-5 py-3 rounded-2xl text-sm font-semibold shadow-xl border ${
+        type === "success"
+          ? "bg-green-500/90 text-white border-green-400/50"
+          : "bg-red-500/90 text-white border-red-400/50"
+      }`}
+      style={{ animation: "fadeInDown 0.2s ease-out", maxWidth: "90vw", textAlign: "center" }}
+    >
+      {type === "success" ? "✅ " : "❌ "}{message}
+    </div>
+  );
+}
+
 // ── 서브 컴포넌트 ──────────────────────────────────────────
 
 function MarketStatusBanner({ status }: { status: MarketStatusInfo }) {
@@ -92,10 +109,11 @@ interface TradeSheetProps {
   myInfo: PortfolioInfo | null;
   marketStatus: MarketStatusInfo | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onTradeSuccess: (updatedInfo: PortfolioInfo) => void;
+  onToast: (msg: string, type: "success" | "error") => void;
 }
 
-function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSuccess }: TradeSheetProps) {
+function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, onClose, onTradeSuccess, onToast }: TradeSheetProps) {
   const [tradeType, setTradeType] = useState<TradeType>("BUY");
   const [orderType, setOrderType] = useState<OrderType>("MARKET");
   const [quantity, setQuantity] = useState(1);
@@ -103,8 +121,8 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
     stock.market === "US" && usdKrw ? stock.price * usdKrw : stock.price
   ));
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"success" | "error">("success");
+  // 거래 성공 후 즉시 반영용 로컬 myInfo
+  const [myInfo, setMyInfo] = useState<PortfolioInfo | null>(initialMyInfo);
 
   const isUS = stock.market === "US";
   const isTradeAllowed = marketStatus?.is_open ?? false;
@@ -112,8 +130,7 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
   const unitPriceKrw = isUS && usdKrw ? stock.price * usdKrw : stock.price;
   const execPrice = orderType === "LIMIT" ? limitPrice : unitPriceKrw;
   const totalKrw = execPrice * quantity;
-  const needKrw = tradeType === "BUY" ? totalKrw : 0;
-  const cashShort = myInfo ? Math.max(0, needKrw - myInfo.cash) : 0;
+  const cashShort = myInfo ? Math.max(0, (tradeType === "BUY" ? totalKrw : 0) - myInfo.cash) : 0;
 
   const handleQuickQty = (type: "all" | "half" | "third") => {
     if (!myInfo) return;
@@ -130,34 +147,32 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
   };
 
   const handleTrade = async () => {
-    setLoading(true); setMessage("");
+    setLoading(true);
     try {
       const endpoint = tradeType === "BUY" ? "/trade/buy" : "/trade/sell";
       const body: Record<string, unknown> = { ticker: stock.ticker, quantity, market: stock.market };
       if (orderType === "LIMIT") body.limit_price = limitPrice;
       const res = await api.post(endpoint, body);
-      setMessage(res.data.message);
-      setMessageType("success");
-      onSuccess();
+
+      // 거래 성공 → 포트폴리오 즉시 갱신
+      const portfolioRes = await api.get("/portfolio/me");
+      const updated: PortfolioInfo = portfolioRes.data;
+      setMyInfo(updated);          // 로컬 즉시 반영
+      onTradeSuccess(updated);     // 부모도 동기화
+
+      onToast(res.data.message, "success");
+      setQuantity(1);
     } catch (e: any) {
-      const detail = e.response?.data?.detail || "거래 실패";
-      setMessage(detail);
-      setMessageType("error");
+      onToast(e.response?.data?.detail || "거래 실패", "error");
     } finally { setLoading(false); }
   };
 
   return (
     <>
-      {/* 딤 배경 */}
       <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
-
-      {/* Sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ animation: "slideUp 0.22s ease-out" }}>
-        <div
-          className="w-full max-w-md bg-gray-900 border-t border-gray-700 rounded-t-3xl px-4 pt-5 pb-10 space-y-3 shadow-2xl"
-          style={{ maxHeight: "90vh", overflowY: "auto" }}
-        >
-          {/* 핸들 */}
+        <div className="w-full max-w-md bg-gray-900 border-t border-gray-700 rounded-t-3xl px-4 pt-5 pb-10 space-y-3 shadow-2xl"
+          style={{ maxHeight: "90vh", overflowY: "auto" }}>
           <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-1" />
 
           {/* 헤더 */}
@@ -174,6 +189,7 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* 거래 후 즉시 반영된 보유 수량 */}
               {heldQty > 0 && (
                 <div className="text-right">
                   <div className="text-xs text-gray-500">보유</div>
@@ -193,7 +209,6 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
             </div>
           </div>
 
-          {/* 장 마감 안내 */}
           {marketStatus && !marketStatus.is_open && (
             <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 text-xs text-gray-400 text-center">
               {marketStatus.message}
@@ -203,17 +218,17 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
 
           {/* 매수/매도 탭 */}
           <div className="flex gap-2">
-            <button onClick={() => { setTradeType("BUY"); setQuantity(1); setMessage(""); }}
+            <button onClick={() => { setTradeType("BUY"); setQuantity(1); }}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "BUY" ? "bg-red-500 text-white" : "bg-gray-700 text-gray-400"}`}>
               매수
             </button>
-            <button onClick={() => { setTradeType("SELL"); setQuantity(1); setMessage(""); }}
+            <button onClick={() => { setTradeType("SELL"); setQuantity(1); }}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "SELL" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-400"}`}>
               매도
             </button>
           </div>
 
-          {/* 주문 유형: 시장가 / 지정가 */}
+          {/* 시장가 / 지정가 */}
           <div className="flex gap-1 bg-gray-800 p-1 rounded-xl">
             <button onClick={() => setOrderType("MARKET")}
               className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${orderType === "MARKET" ? "bg-gray-600 text-white" : "text-gray-500"}`}>
@@ -225,34 +240,29 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
             </button>
           </div>
 
-          {/* 지정가 입력 */}
           {orderType === "LIMIT" && (
             <div className="bg-gray-800 rounded-xl px-4 py-3">
               <div className="text-xs text-gray-400 mb-1.5">지정 가격 (원화)</div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setLimitPrice(p => Math.max(1, p - (p >= 10000 ? 100 : 10)))}
                   className="bg-gray-700 text-white w-9 h-9 rounded-lg font-bold text-base">−</button>
-                <input
-                  type="number"
-                  value={limitPrice}
+                <input type="number" value={limitPrice}
                   onChange={(e) => setLimitPrice(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-center font-bold outline-none text-sm"
-                />
+                  className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-center font-bold outline-none text-sm" />
                 <button onClick={() => setLimitPrice(p => p + (p >= 10000 ? 100 : 10))}
                   className="bg-gray-700 text-white w-9 h-9 rounded-lg font-bold text-base">+</button>
               </div>
               <div className="text-xs text-gray-500 mt-1.5 text-center">
                 현재가 {isUS ? `$${stock.price.toFixed(2)} (≈${Math.round(unitPriceKrw).toLocaleString()}원)` : `${stock.price.toLocaleString()}원`}
-                {limitPrice < unitPriceKrw * 0.9 || limitPrice > unitPriceKrw * 1.1
-                  ? <span className="text-yellow-500 ml-1">⚠ 현재가와 10% 이상 차이</span>
-                  : null}
+                {(limitPrice < unitPriceKrw * 0.9 || limitPrice > unitPriceKrw * 1.1) &&
+                  <span className="text-yellow-500 ml-1">⚠ 현재가와 10% 이상 차이</span>}
               </div>
             </div>
           )}
 
           {/* 빠른 수량 */}
           <div className="flex gap-2">
-            {[{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "전량", type: "all" as const }].map((btn) => (
+            {([{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "전량", type: "all" as const }]).map((btn) => (
               <button key={btn.type} onClick={() => handleQuickQty(btn.type)} disabled={!isTradeAllowed}
                 className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-40">
                 {btn.label}
@@ -263,13 +273,13 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
           {/* 수량 */}
           <div className="flex items-center gap-3">
             <button onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={!isTradeAllowed}
-              className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">−</button>
+              className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl disabled:opacity-40">−</button>
             <input type="number" min={1} value={quantity}
               onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
               disabled={!isTradeAllowed}
               className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 text-center font-bold outline-none text-lg disabled:opacity-40" />
             <button onClick={() => setQuantity(quantity + 1)} disabled={!isTradeAllowed}
-              className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">+</button>
+              className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl disabled:opacity-40">+</button>
           </div>
 
           {/* 금액 요약 */}
@@ -294,31 +304,17 @@ function TradeBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
               </div>
             )}
             {tradeType === "SELL" && heldQty < quantity && (
-              <div className="text-xs text-red-400 text-right">
-                보유 수량 초과 ({heldQty}주 보유 중)
-              </div>
+              <div className="text-xs text-red-400 text-right">보유 수량 초과 ({heldQty}주 보유 중)</div>
             )}
           </div>
 
-          {/* 메시지 */}
-          {message && (
-            <div className={`text-sm text-center py-2.5 rounded-xl font-medium ${
-              messageType === "success"
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-red-500/20 text-red-400 border border-red-500/30"
-            }`}>{message}</div>
-          )}
-
-          {/* 거래 버튼 */}
-          <button
-            onClick={handleTrade}
+          <button onClick={handleTrade}
             disabled={loading || !isTradeAllowed || (tradeType === "BUY" && cashShort > 0) || (tradeType === "SELL" && heldQty < quantity)}
             className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
               !isTradeAllowed ? "bg-gray-700 text-gray-500 cursor-not-allowed"
               : tradeType === "BUY" ? "bg-red-500 hover:bg-red-400 text-white"
               : "bg-blue-500 hover:bg-blue-400 text-white"
-            } disabled:opacity-60`}
-          >
+            } disabled:opacity-60`}>
             {loading ? "처리 중..."
               : !isTradeAllowed ? "장 마감 (거래 불가)"
               : orderType === "LIMIT" ? `${tradeType === "BUY" ? "매수" : "매도"} 지정가 주문`
@@ -339,15 +335,12 @@ interface ShortSheetProps {
   marketStatus: MarketStatusInfo | null;
   onClose: () => void;
   onSuccess: () => void;
-  shortMessage: string;
-  shortMessageType: "success" | "error";
+  onToast: (msg: string, type: "success" | "error") => void;
 }
 
-function ShortBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSuccess, shortMessage, shortMessageType }: ShortSheetProps) {
+function ShortBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSuccess, onToast }: ShortSheetProps) {
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(shortMessage);
-  const [msgType, setMsgType] = useState(shortMessageType);
 
   const isUS = stock.market === "US";
   const isShortAllowed = marketStatus?.is_open ?? false;
@@ -365,13 +358,14 @@ function ShortBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
   };
 
   const handleShortOpen = async () => {
-    setLoading(true); setMessage("");
+    setLoading(true);
     try {
       const res = await api.post("/short/open", { ticker: stock.ticker, quantity: qty, market: stock.market });
-      setMessage(res.data.message); setMsgType("success");
+      onToast(res.data.message, "success");
       onSuccess();
+      onClose();
     } catch (e: any) {
-      setMessage(e.response?.data?.detail || "공매도 실패"); setMsgType("error");
+      onToast(e.response?.data?.detail || "공매도 실패", "error");
     } finally { setLoading(false); }
   };
 
@@ -411,7 +405,7 @@ function ShortBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
           )}
 
           <div className="flex gap-2">
-            {[{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "최대", type: "all" as const }].map((btn) => (
+            {([{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "최대", type: "all" as const }]).map((btn) => (
               <button key={btn.type} onClick={() => handleQuickQty(btn.type)} disabled={!isShortAllowed}
                 className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-40">
                 {btn.label}
@@ -442,12 +436,6 @@ function ShortBottomSheet({ stock, usdKrw, myInfo, marketStatus, onClose, onSucc
               </div>
             )}
           </div>
-
-          {message && (
-            <div className={`text-sm text-center py-2.5 rounded-xl font-medium ${
-              msgType === "success" ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
-            }`}>{message}</div>
-          )}
 
           <button onClick={handleShortOpen} disabled={loading || !isShortAllowed || cashShort > 0}
             className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
@@ -481,10 +469,18 @@ export default function TradePage() {
   const [shortSelected, setShortSelected] = useState<StockInfo | null>(null);
   const [shortPositions, setShortPositions] = useState<ShortPosition[]>([]);
   const [shortLoading, setShortLoading] = useState(false);
-  const [shortMessage, setShortMessage] = useState("");
-  const [shortMessageType, setShortMessageType] = useState<"success" | "error">("success");
   const [shortStocks, setShortStocks] = useState<StockInfo[]>([]);
   const [shortQuery, setShortQuery] = useState("");
+
+  // Toast 상태
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string, type: "success" | "error") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const currentMarketStatus: MarketStatusInfo | null = selected
     ? (selected.market === "KR" ? marketStatus?.KR : marketStatus?.US) ?? null
@@ -524,27 +520,44 @@ export default function TradePage() {
       .finally(() => setPopularLoading(false));
   }, [market]);
 
+  // 키보드 닫고 sheet 열기 (모바일 키보드 겹침 방지)
+  const openSheet = useCallback((stock: StockInfo) => {
+    (document.activeElement as HTMLElement)?.blur();
+    // blur 후 키보드가 내려갈 시간 살짝 대기
+    setTimeout(() => setSelected(stock), 100);
+  }, []);
+
+  const openShortSheet = useCallback((stock: StockInfo) => {
+    (document.activeElement as HTMLElement)?.blur();
+    setTimeout(() => setShortSelected(stock), 100);
+  }, []);
+
   const handleSearch = async () => {
     if (!query.trim()) return;
+    (document.activeElement as HTMLElement)?.blur();
     const res = await api.get(`/stock/search?q=${encodeURIComponent(query)}&market=${market}`);
     setStocks(res.data);
   };
 
   const handleShortSearch = async () => {
     if (!shortQuery.trim()) return;
+    (document.activeElement as HTMLElement)?.blur();
     const res = await api.get(`/stock/search?q=${encodeURIComponent(shortQuery)}&market=${market}`);
     setShortStocks(res.data);
   };
 
   const handleShortClose = async (positionId: number) => {
-    setShortLoading(true); setShortMessage("");
+    setShortLoading(true);
     try {
       const res = await api.post(`/short/close/${positionId}`);
-      setShortMessage(`청산 완료 (${res.data.profit >= 0 ? "+" : ""}${res.data.profit.toLocaleString()}원, ${res.data.profit_pct.toFixed(2)}%)`);
-      setShortMessageType(res.data.profit >= 0 ? "success" : "error");
+      const profit = res.data.profit;
+      showToast(
+        `청산 완료 (${profit >= 0 ? "+" : ""}${profit.toLocaleString()}원, ${res.data.profit_pct.toFixed(2)}%)`,
+        profit >= 0 ? "success" : "error"
+      );
       fetchMyInfo(); fetchShortPositions();
     } catch (e: any) {
-      setShortMessage(e.response?.data?.detail || "청산 실패"); setShortMessageType("error");
+      showToast(e.response?.data?.detail || "청산 실패", "error");
     } finally { setShortLoading(false); }
   };
 
@@ -553,6 +566,9 @@ export default function TradePage() {
 
   return (
     <>
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} />}
+
       <main className="max-w-md mx-auto px-4 py-6 space-y-4" style={{ background: "#0f0f0f", minHeight: "100vh" }}>
         {/* 헤더 */}
         <div className="flex items-center justify-between">
@@ -566,7 +582,6 @@ export default function TradePage() {
           )}
         </div>
 
-        {/* 장 상태 배너 */}
         {marketStatus && (
           <div className="space-y-1.5">
             <MarketStatusBanner status={marketStatus.KR} />
@@ -601,9 +616,13 @@ export default function TradePage() {
             </div>
 
             <div className="flex gap-2">
-              <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="종목명, 티커 검색..."
-                className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 text-sm outline-none placeholder-gray-500 border border-gray-700 focus:border-yellow-400 transition-colors" />
+                className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 text-sm outline-none placeholder-gray-500 border border-gray-700 focus:border-yellow-400 transition-colors"
+              />
               <button onClick={handleSearch} className="bg-yellow-400 text-gray-900 px-5 rounded-xl font-bold text-sm hover:bg-yellow-300 transition-colors">검색</button>
             </div>
 
@@ -620,7 +639,7 @@ export default function TradePage() {
                   {displayList.map((s) => {
                     const mStatus = s.market === "KR" ? marketStatus?.KR : marketStatus?.US;
                     return (
-                      <button key={s.ticker} onClick={() => setSelected(s)}
+                      <button key={s.ticker} onClick={() => openSheet(s)}
                         className={`w-full rounded-2xl p-4 flex justify-between items-center transition-all border ${
                           selected?.ticker === s.ticker ? "bg-yellow-400/10 border-yellow-400/50" : "bg-gray-800 border-transparent hover:border-gray-600"
                         }`}>
@@ -695,26 +714,23 @@ export default function TradePage() {
               </div>
             )}
 
-            {shortMessage && (
-              <div className={`text-sm text-center py-3 rounded-xl font-medium ${
-                shortMessageType === "success" ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
-              }`}>{shortMessage}</div>
-            )}
-
             <div>
               <p className="text-xs text-gray-500 mb-2 font-medium">📉 공매도 종목 선택</p>
               <div className="flex gap-2 mb-3">
-                <input value={shortQuery} onChange={(e) => setShortQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleShortSearch()}
+                <input
+                  value={shortQuery}
+                  onChange={(e) => setShortQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleShortSearch()}
                   placeholder="종목명, 티커 검색..."
-                  className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 text-sm outline-none placeholder-gray-500 border border-gray-700 focus:border-orange-400 transition-colors" />
+                  className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 text-sm outline-none placeholder-gray-500 border border-gray-700 focus:border-orange-400 transition-colors"
+                />
                 <button onClick={handleShortSearch} className="bg-orange-500 text-white px-5 rounded-xl font-bold text-sm hover:bg-orange-400 transition-colors">검색</button>
               </div>
-
               <div className="space-y-2">
                 {shortDisplayList.map((s) => {
                   const mStatus = s.market === "KR" ? marketStatus?.KR : marketStatus?.US;
                   return (
-                    <button key={s.ticker} onClick={() => setShortSelected(s)}
+                    <button key={s.ticker} onClick={() => openShortSheet(s)}
                       className={`w-full rounded-2xl p-3 flex justify-between items-center transition-all border ${
                         shortSelected?.ticker === s.ticker ? "bg-orange-500/10 border-orange-500/50" : "bg-gray-800 border-transparent hover:border-gray-600"
                       }`}>
@@ -750,7 +766,8 @@ export default function TradePage() {
           myInfo={myInfo}
           marketStatus={currentMarketStatus}
           onClose={() => setSelected(null)}
-          onSuccess={fetchMyInfo}
+          onTradeSuccess={(updated) => setMyInfo(updated)}
+          onToast={showToast}
         />
       )}
 
@@ -763,8 +780,7 @@ export default function TradePage() {
           marketStatus={shortMarketStatus}
           onClose={() => setShortSelected(null)}
           onSuccess={() => { fetchMyInfo(); fetchShortPositions(); }}
-          shortMessage={shortMessage}
-          shortMessageType={shortMessageType}
+          onToast={showToast}
         />
       )}
 
@@ -772,6 +788,10 @@ export default function TradePage() {
         @keyframes slideUp {
           from { transform: translateY(100%); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeInDown {
+          from { transform: translate(-50%, -16px); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
         }
       `}</style>
     </>
