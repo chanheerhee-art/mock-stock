@@ -29,6 +29,8 @@ class Base(DeclarativeBase):
 class TradeType(str, enum.Enum):
     BUY = "BUY"
     SELL = "SELL"
+    SHORT_OPEN = "SHORT_OPEN"    # 공매도 진입
+    SHORT_CLOSE = "SHORT_CLOSE"  # 공매도 청산
 
 
 class User(Base):
@@ -99,6 +101,24 @@ class SeasonResult(Base):
     profit_pct = Column(Float)
     rank = Column(Integer)
     recorded_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ShortPosition(Base):
+    """공매도 포지션"""
+    __tablename__ = "short_positions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    ticker = Column(String)
+    name = Column(String)
+    market = Column(String)
+    exchange = Column(String, nullable=True)
+    quantity = Column(Integer, default=0)
+    entry_price = Column(Float)        # 진입가 (원화 기준)
+    margin = Column(Float)             # 담보 예치금 (진입가 * 수량 * 30%)
+    is_open = Column(Boolean, default=True)
+    opened_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
 
 
 class AssetSnapshot(Base):

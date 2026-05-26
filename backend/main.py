@@ -7,7 +7,7 @@ from datetime import datetime
 import pytz
 
 from models.database import init_db
-from routers import auth, trade, portfolio, ranking, stock, season
+from routers import auth, trade, portfolio, ranking, stock, season, short
 from routers.snapshot import save_daily_snapshots
 
 KST = pytz.timezone("Asia/Seoul")
@@ -60,6 +60,7 @@ app.include_router(portfolio.router)
 app.include_router(ranking.router)
 app.include_router(stock.router)
 app.include_router(season.router)
+app.include_router(short.router)
 
 
 @app.get("/")

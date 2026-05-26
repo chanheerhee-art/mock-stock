@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from models.database import get_db, User, Portfolio, AssetSnapshot
+from models.database import get_db, User, Portfolio, AssetSnapshot, ShortPosition
 from services.stock import get_stock_price
 from services.exchange_rate import get_usd_krw
 from services.auth import decode_jwt
@@ -77,7 +77,21 @@ async def get_my_portfolio(user: User = Depends(get_current_user), db: AsyncSess
             "usd_krw": round(usd_krw, 2) if is_us else None,
         })
 
-    total_assets = user.cash + total_eval_krw
+    # 숏 포지션 평가손익 반영 (담보금은 이미 cash에서 차감됨)
+    short_result = await db.execute(
+        select(ShortPosition).where(ShortPosition.user_id == user.id, ShortPosition.is_open == True)
+    )
+    short_positions = short_result.scalars().all()
+    short_unrealized = 0.0
+    for sp in short_positions:
+        price_info = await get_stock_price(sp.ticker)
+        if not price_info:
+            continue
+        is_us = price_info["market"] == "US"
+        cur_price_krw = price_info["price"] * usd_krw if is_us else price_info["price"]
+        short_unrealized += (sp.entry_price - cur_price_krw) * sp.quantity
+
+    total_assets = user.cash + total_eval_krw + short_unrealized
     total_profit = total_assets - SEED_MONEY
     total_profit_pct = (total_profit / SEED_MONEY) * 100
 
@@ -91,6 +105,7 @@ async def get_my_portfolio(user: User = Depends(get_current_user), db: AsyncSess
         "total_profit_pct": round(total_profit_pct, 2),
         "holdings": holdings,
         "usd_krw": round(usd_krw, 2),
+        "short_unrealized": round(short_unrealized, 0),
     }
 
 

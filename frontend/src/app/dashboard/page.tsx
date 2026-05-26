@@ -22,6 +22,18 @@ interface Holding {
   usd_krw: number | null;
 }
 
+interface ShortPosition {
+  id: number;
+  ticker: string;
+  name: string;
+  exchange: string;
+  quantity: number;
+  entry_price: number;
+  current_price: number;
+  profit: number;
+  profit_pct: number;
+}
+
 interface Portfolio {
   cash: number;
   total_eval: number;
@@ -32,6 +44,7 @@ interface Portfolio {
   profile_image?: string;
   holdings: Holding[];
   usd_krw: number;
+  short_unrealized: number;
 }
 
 interface ChartPoint { date: string; total_assets: number; profit_pct: number; }
@@ -49,16 +62,19 @@ export default function Dashboard() {
   const router = useRouter();
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
+  const [shortPositions, setShortPositions] = useState<ShortPosition[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
-      const [portfolioRes, chartRes] = await Promise.all([
+      const [portfolioRes, chartRes, shortRes] = await Promise.all([
         api.get("/portfolio/me"),
         api.get("/portfolio/history-chart").catch(() => ({ data: [] })),
+        api.get("/short/positions").catch(() => ({ data: [] })),
       ]);
       setPortfolio(portfolioRes.data);
       setChartData(chartRes.data);
+      setShortPositions(shortRes.data);
     } catch {
       localStorage.clear();
       router.replace("/");
@@ -145,9 +161,14 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="mt-3 pt-3 border-t border-gray-700/50 flex gap-4 text-xs text-gray-400">
+        <div className="mt-3 pt-3 border-t border-gray-700/50 flex gap-3 text-xs text-gray-400 flex-wrap">
           <span>💵 현금 {portfolio.cash.toLocaleString()}원</span>
           <span>📊 주식 {portfolio.total_eval.toLocaleString()}원</span>
+          {portfolio.short_unrealized !== 0 && (
+            <span className={portfolio.short_unrealized >= 0 ? "text-blue-400" : "text-red-400"}>
+              📉 공매도 {portfolio.short_unrealized >= 0 ? "+" : ""}{portfolio.short_unrealized.toLocaleString()}원
+            </span>
+          )}
         </div>
       </div>
 
@@ -169,6 +190,37 @@ export default function Dashboard() {
           </Link>
         ))}
       </div>
+
+      {/* 공매도 포지션 */}
+      {shortPositions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-300">📉 공매도 포지션</h2>
+            <span className="text-xs text-gray-500">{shortPositions.length}개</span>
+          </div>
+          <div className="space-y-2">
+            {shortPositions.map((p) => (
+              <div key={p.id} className="bg-gray-800 border border-orange-500/20 rounded-2xl p-4 flex justify-between items-center">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-white">{p.name}</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-400 font-medium">SHORT</span>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {p.quantity}주 · 진입 {p.entry_price.toLocaleString()}원
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-white">{p.current_price.toLocaleString()}원</div>
+                  <div className={`text-xs font-semibold mt-0.5 ${p.profit >= 0 ? "text-blue-400" : "text-red-400"}`}>
+                    {p.profit >= 0 ? "+" : ""}{p.profit_pct.toFixed(2)}%
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 보유 종목 */}
       <div>
