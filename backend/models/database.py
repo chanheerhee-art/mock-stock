@@ -42,6 +42,10 @@ class User(Base):
     profile_image = Column(String, nullable=True)
     cash = Column(Float, default=SEED_MONEY)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # 카카오 메시지 전송용 토큰
+    kakao_access_token = Column(String, nullable=True)
+    kakao_refresh_token = Column(String, nullable=True)
+    kakao_token_expires = Column(DateTime, nullable=True)
 
 
 class Portfolio(Base):

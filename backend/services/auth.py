@@ -14,8 +14,8 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 30
 
 
-async def kakao_get_token(code: str) -> str:
-    """카카오 인가코드 → 액세스 토큰"""
+async def kakao_get_token(code: str) -> dict:
+    """카카오 인가코드 → 토큰 정보 (access + refresh)"""
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             "https://kauth.kakao.com/oauth/token",
@@ -28,7 +28,23 @@ async def kakao_get_token(code: str) -> str:
             },
         )
         resp.raise_for_status()
-        return resp.json()["access_token"]
+        return resp.json()  # access_token, refresh_token, expires_in 포함
+
+
+async def kakao_refresh_access_token(refresh_token: str) -> dict:
+    """리프레시 토큰으로 액세스 토큰 갱신"""
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://kauth.kakao.com/oauth/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": KAKAO_CLIENT_ID,
+                "client_secret": KAKAO_CLIENT_SECRET,
+                "refresh_token": refresh_token,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
 
 
 async def kakao_get_user(access_token: str) -> dict:

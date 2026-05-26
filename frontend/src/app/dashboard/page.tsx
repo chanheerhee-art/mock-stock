@@ -5,6 +5,103 @@ import Link from "next/link";
 import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import api from "@/lib/api";
 
+// ── 종목 상세 모달 ─────────────────────────────────────────
+
+function HoldingDetailModal({ holding, totalAssets, onClose }: {
+  holding: Holding;
+  totalAssets: number;
+  onClose: () => void;
+}) {
+  const weight = totalAssets > 0 ? (holding.eval_amount / totalAssets) * 100 : 0;
+  const profitAbs = holding.profit;
+  const isProfit = profitAbs >= 0;
+  const costBasis = holding.avg_price * holding.quantity;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center" style={{ animation: "slideUp 0.22s ease-out" }}>
+        <div className="w-full max-w-md bg-gray-900 border-t border-gray-700 rounded-t-3xl px-5 pt-5 pb-10 space-y-4 shadow-2xl">
+          <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto" />
+
+          {/* 헤더 */}
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="font-bold text-white text-lg">{holding.name}</div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-gray-500">{holding.ticker}</span>
+                <span className="text-xs text-gray-600">·</span>
+                <span className="text-xs text-gray-500">{holding.quantity}주 보유</span>
+              </div>
+            </div>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xl">✕</button>
+          </div>
+
+          {/* 평가손익 크게 */}
+          <div className={`rounded-2xl p-4 ${isProfit ? "bg-red-500/10 border border-red-500/20" : "bg-blue-500/10 border border-blue-500/20"}`}>
+            <div className="text-xs text-gray-400 mb-1">평가손익</div>
+            <div className={`text-2xl font-bold ${isProfit ? "text-red-400" : "text-blue-400"}`}>
+              {isProfit ? "+" : ""}{profitAbs.toLocaleString()}원
+            </div>
+            <div className={`text-sm font-semibold mt-0.5 ${isProfit ? "text-red-400" : "text-blue-400"}`}>
+              {isProfit ? "▲" : "▼"} {Math.abs(holding.profit_pct).toFixed(2)}%
+            </div>
+          </div>
+
+          {/* 상세 수치 */}
+          <div className="space-y-2.5">
+            {[
+              { label: "현재가", value: holding.is_us ? `$${holding.current_price.toFixed(2)} (${holding.current_price_krw.toLocaleString()}원)` : `${holding.current_price_krw.toLocaleString()}원` },
+              { label: "평균 매입가", value: `${holding.avg_price.toLocaleString()}원` },
+              { label: "매입 총액", value: `${costBasis.toLocaleString()}원` },
+              { label: "평가 금액", value: `${holding.eval_amount.toLocaleString()}원` },
+              { label: "포트폴리오 비중", value: `${weight.toFixed(1)}%` },
+              { label: "당일 등락", value: holding.change_pct >= 0 ? `▲ ${holding.change_pct.toFixed(2)}%` : `▼ ${Math.abs(holding.change_pct).toFixed(2)}%` },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex justify-between items-center text-sm border-b border-gray-800 pb-2">
+                <span className="text-gray-400">{label}</span>
+                <span className={`font-semibold ${
+                  label === "당일 등락"
+                    ? holding.change_pct >= 0 ? "text-red-400" : "text-blue-400"
+                    : label === "포트폴리오 비중" ? "text-yellow-400"
+                    : "text-white"
+                }`}>{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* 비중 바 */}
+          <div>
+            <div className="text-xs text-gray-500 mb-1.5">포트폴리오 내 비중</div>
+            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${isProfit ? "bg-red-500" : "bg-blue-500"}`}
+                style={{ width: `${Math.min(weight, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-600 mt-1">
+              <span>0%</span>
+              <span>{weight.toFixed(1)}%</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <Link href={`/stock/${holding.ticker}`}
+            className="block w-full text-center bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold py-3 rounded-xl text-sm transition-all active:scale-95">
+            📊 {holding.name} 차트 보기 →
+          </Link>
+        </div>
+      </div>
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+    </>
+  );
+}
+
 interface Holding {
   ticker: string;
   name: string;
@@ -64,6 +161,7 @@ export default function Dashboard() {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [shortPositions, setShortPositions] = useState<ShortPosition[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedHolding, setSelectedHolding] = useState<Holding | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -104,6 +202,7 @@ export default function Dashboard() {
   const hasChart = chartData.length >= 2;
 
   return (
+    <>
     <main className="max-w-md mx-auto px-4 py-6 space-y-4" style={{ background: "#0f0f0f", minHeight: "100vh" }}>
       {/* 헤더 */}
       <div className="flex items-center justify-between">
@@ -240,8 +339,8 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-2">
             {portfolio.holdings.map((h) => (
-              <Link key={h.ticker} href={`/stock/${h.ticker}`}>
-                <div className="bg-gray-800 border border-gray-700 rounded-2xl p-4 flex justify-between items-center hover:border-gray-500 transition-all">
+              <button key={h.ticker} onClick={() => setSelectedHolding(h)} className="w-full text-left">
+                <div className="bg-gray-800 border border-gray-700 rounded-2xl p-4 flex justify-between items-center hover:border-gray-500 transition-all active:scale-[0.98]">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-white">{h.name}</span>
@@ -251,9 +350,6 @@ export default function Dashboard() {
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">
                       {h.quantity}주 · 평단 {h.avg_price.toLocaleString()}원
-                      {h.is_us && h.usd_krw && (
-                        <span className="text-gray-600 ml-1">(환율 {h.usd_krw.toLocaleString()})</span>
-                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -266,11 +362,20 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-              </Link>
+              </button>
             ))}
           </div>
         )}
       </div>
     </main>
+
+    {selectedHolding && (
+      <HoldingDetailModal
+        holding={selectedHolding}
+        totalAssets={portfolio.total_assets}
+        onClose={() => setSelectedHolding(null)}
+      />
+    )}
+    </>
   );
 }

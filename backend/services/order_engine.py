@@ -97,6 +97,21 @@ async def _fill_order(order: PendingOrder, price_krw: float, db):
     await db.commit()
     print(f"[OrderEngine] 주문 #{order.id} 체결 ({order.trade_type} {order.ticker} {order.quantity}주 @ {price_krw:,.0f}원)")
 
+    # 카카오톡 체결 알림
+    try:
+        from services.kakao_notify import send_order_filled_notify
+        total = price_krw * order.quantity
+        await send_order_filled_notify(order.user_id, {
+            "name": order.name,
+            "ticker": order.ticker,
+            "trade_type": order.trade_type,
+            "quantity": order.quantity,
+            "price": price_krw,
+            "total": total,
+        })
+    except Exception as e:
+        print(f"[OrderEngine] 카카오 알림 오류: {e}")
+
 
 async def check_and_fill_orders():
     """미체결 주문 체크 및 체결"""
