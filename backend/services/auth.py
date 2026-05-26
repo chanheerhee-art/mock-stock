@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 KAKAO_CLIENT_ID = os.getenv("KAKAO_CLIENT_ID")
+KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET")
 KAKAO_REDIRECT_URI = os.getenv("KAKAO_REDIRECT_URI")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret")
 JWT_ALGORITHM = "HS256"
@@ -21,6 +22,7 @@ async def kakao_get_token(code: str) -> str:
             data={
                 "grant_type": "authorization_code",
                 "client_id": KAKAO_CLIENT_ID,
+                "client_secret": KAKAO_CLIENT_SECRET,
                 "redirect_uri": KAKAO_REDIRECT_URI,
                 "code": code,
             },
