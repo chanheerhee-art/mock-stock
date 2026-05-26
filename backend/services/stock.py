@@ -5,6 +5,103 @@ from typing import Optional
 POPULAR_KR = ["005930", "000660", "035420", "035720", "005380", "373220", "068270", "247540"]
 POPULAR_US = ["AAPL", "NVDA", "TSLA", "MSFT", "GOOGL", "META", "AMZN", "PLTR"]
 
+# 미국 주식 한글 이름 매핑
+US_NAME_KO: dict[str, str] = {
+    # 빅테크
+    "AAPL": "애플",
+    "MSFT": "마이크로소프트",
+    "GOOGL": "알파벳(구글)",
+    "GOOG": "알파벳(구글)",
+    "META": "메타",
+    "AMZN": "아마존",
+    "NVDA": "엔비디아",
+    "TSLA": "테슬라",
+    "NFLX": "넷플릭스",
+    "ORCL": "오라클",
+    "INTC": "인텔",
+    "AMD": "AMD",
+    "QCOM": "퀄컴",
+    "AVGO": "브로드컴",
+    "TXN": "텍사스인스트루먼트",
+    "MU": "마이크론",
+    "AMAT": "어플라이드머티리얼즈",
+    "ASML": "ASML",
+    "ARM": "ARM홀딩스",
+    # 금융
+    "JPM": "JP모건",
+    "BAC": "뱅크오브아메리카",
+    "WFC": "웰스파고",
+    "GS": "골드만삭스",
+    "MS": "모건스탠리",
+    "C": "씨티그룹",
+    "BRK-B": "버크셔해서웨이",
+    "V": "비자",
+    "MA": "마스터카드",
+    "AXP": "아메리칸익스프레스",
+    "PYPL": "페이팔",
+    "COF": "캐피탈원",
+    # 소비재/유통
+    "WMT": "월마트",
+    "COST": "코스트코",
+    "HD": "홈디포",
+    "TGT": "타겟",
+    "NKE": "나이키",
+    "MCD": "맥도날드",
+    "SBUX": "스타벅스",
+    "KO": "코카콜라",
+    "PEP": "펩시코",
+    "PM": "필립모리스",
+    # 헬스케어
+    "JNJ": "존슨앤존슨",
+    "UNH": "유나이티드헬스",
+    "PFE": "화이자",
+    "ABBV": "애브비",
+    "MRK": "머크",
+    "LLY": "일라이릴리",
+    "BMY": "브리스톨마이어스스퀴브",
+    # 통신/미디어
+    "DIS": "디즈니",
+    "CMCSA": "컴캐스트",
+    "T": "AT&T",
+    "VZ": "버라이즌",
+    "TMUS": "T모바일",
+    # 기타 테크
+    "CRM": "세일즈포스",
+    "ADBE": "어도비",
+    "NOW": "서비스나우",
+    "UBER": "우버",
+    "LYFT": "리프트",
+    "SNAP": "스냅",
+    "PINS": "핀터레스트",
+    "SPOT": "스포티파이",
+    "RBLX": "로블록스",
+    "PLTR": "팔란티어",
+    "COIN": "코인베이스",
+    "HOOD": "로빈후드",
+    "SOFI": "소파이",
+    "AFRM": "어펌",
+    "RIVN": "리비안",
+    "LCID": "루시드모터스",
+    "NIO": "니오",
+    "XPEV": "샤오펑",
+    "LI": "리오토모",
+    "BABA": "알리바바",
+    "JD": "징둥닷컴",
+    "BIDU": "바이두",
+    "PDD": "핀둬둬",
+    # ETF
+    "SPY": "S&P500 ETF",
+    "QQQ": "나스닥100 ETF",
+    "DIA": "다우존스 ETF",
+    "IWM": "러셀2000 ETF",
+    "ARKK": "ARK 이노베이션 ETF",
+    "SOXL": "반도체 3배 레버리지 ETF",
+    "TQQQ": "나스닥100 3배 레버리지 ETF",
+    "SQQQ": "나스닥100 3배 인버스 ETF",
+    "VTI": "미국 전체주식 ETF",
+    "VOO": "뱅가드 S&P500 ETF",
+}
+
 
 # ── 가격 조회 ──────────────────────────────────────────────
 
@@ -58,9 +155,12 @@ async def get_yahoo_price(ticker: str) -> Optional[dict]:
         if meta.get("quoteType") == "ETF":
             exchange = "ETF"
 
+        eng_name = meta.get("longName") or meta.get("shortName", ticker)
+        name = US_NAME_KO.get(ticker.upper(), eng_name)
+
         return {
             "ticker": ticker,
-            "name": meta.get("longName") or meta.get("shortName", ticker),
+            "name": name,
             "price": current_price,
             "change": change,
             "change_pct": change_pct,

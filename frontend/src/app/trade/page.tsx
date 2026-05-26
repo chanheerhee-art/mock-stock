@@ -242,7 +242,7 @@ export default function TradePage() {
   const priceKrw = (s: StockInfo) => s.market === "US" && usdKrw ? s.price * usdKrw : s.price;
 
   return (
-    <main className="max-w-md mx-auto px-4 py-6 space-y-4" style={{ background: "#0f0f0f", minHeight: "100vh" }}>
+    <main className="max-w-md mx-auto px-4 py-6 space-y-4" style={{ background: "#0f0f0f", minHeight: "100vh", paddingBottom: selected || shortSelected ? "420px" : "24px" }}>
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <Link href="/dashboard" className="text-gray-400 text-sm hover:text-white">← 홈</Link>
@@ -344,96 +344,6 @@ export default function TradePage() {
             )}
           </div>
 
-          {/* 거래 패널 */}
-          {selected && (
-            <div className="bg-gray-800 rounded-2xl p-5 space-y-4 border border-gray-700">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-bold text-white">{selected.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-sm text-gray-400">
-                      {selected.market === "US" ? `$${selected.price.toFixed(2)}` : `${selected.price.toLocaleString()}원`}
-                    </span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${EXCHANGE_BADGE[selected.exchange] ?? "bg-gray-600 text-gray-300"}`}>{selected.exchange}</span>
-                  </div>
-                </div>
-                <div className="text-right space-y-1">
-                  {heldQty > 0 && <div><div className="text-xs text-gray-500">보유</div><div className="text-sm font-semibold text-white">{heldQty}주</div></div>}
-                  {currentMarketStatus && (
-                    <div className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
-                      currentMarketStatus.is_open ? "bg-green-500/20 text-green-400"
-                      : currentMarketStatus.status === "pre" ? "bg-yellow-500/20 text-yellow-400"
-                      : "bg-gray-700 text-gray-400"
-                    }`}>
-                      {currentMarketStatus.is_open ? "● 거래 가능" : currentMarketStatus.status === "pre" ? "● 장전" : "● 마감"}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {currentMarketStatus && !currentMarketStatus.is_open && (
-                <div className="bg-gray-700/50 rounded-xl px-4 py-3 text-xs text-gray-400 text-center">
-                  {currentMarketStatus.message}
-                  <div className="text-gray-500 mt-0.5">개장: {currentMarketStatus.open_time} ~ {currentMarketStatus.close_time}</div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button onClick={() => { setTradeType("BUY"); setQuantity(1); }}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "BUY" ? "bg-red-500 text-white" : "bg-gray-700 text-gray-400"}`}>매수</button>
-                <button onClick={() => { setTradeType("SELL"); setQuantity(1); }}
-                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "SELL" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-400"}`}>매도</button>
-              </div>
-
-              <div className="flex gap-2">
-                {[{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "전량", type: "all" as const }].map((btn) => (
-                  <button key={btn.type} onClick={() => handleQuickQty(btn.type)} disabled={!isTradeAllowed}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                    {btn.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={!isTradeAllowed}
-                  className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">−</button>
-                <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  disabled={!isTradeAllowed} className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 text-center font-bold outline-none text-lg disabled:opacity-40" />
-                <button onClick={() => setQuantity(quantity + 1)} disabled={!isTradeAllowed}
-                  className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">+</button>
-              </div>
-
-              <div className="bg-gray-700/50 rounded-xl px-4 py-3 space-y-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">예상 금액</span>
-                  <span className="text-white font-bold">
-                    {selected.market === "US" ? `$${(selected.price * quantity).toFixed(2)}` : `${(selected.price * quantity).toLocaleString()}원`}
-                  </span>
-                </div>
-                {selected.market === "US" && usdKrw && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-xs">원화 환산 (₩{usdKrw.toLocaleString()})</span>
-                    <span className="text-gray-300 text-sm font-semibold">≈ {(selected.price * usdKrw * quantity).toLocaleString()}원</span>
-                  </div>
-                )}
-              </div>
-
-              {message && (
-                <div className={`text-sm text-center py-3 rounded-xl font-medium ${
-                  messageType === "success" ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
-                }`}>{message}</div>
-              )}
-
-              <button onClick={handleTrade} disabled={loading || !isTradeAllowed}
-                className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
-                  !isTradeAllowed ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                  : tradeType === "BUY" ? "bg-red-500 hover:bg-red-400 text-white"
-                  : "bg-blue-500 hover:bg-blue-400 text-white"
-                } disabled:opacity-60`}>
-                {loading ? "처리 중..." : !isTradeAllowed ? "장 마감 (거래 불가)" : `${tradeType === "BUY" ? "매수" : "매도"} 확인`}
-              </button>
-            </div>
-          )}
         </>
       )}
 
@@ -531,16 +441,121 @@ export default function TradePage() {
             </div>
           </div>
 
-          {/* 공매도 진입 패널 */}
-          {shortSelected && (
-            <div className="bg-gray-800 rounded-2xl p-5 space-y-4 border border-orange-500/30">
-              <div className="flex justify-between items-center">
+        </>
+      )}
+
+      {/* ── 하단 고정 거래 패널 (일반 거래) ── */}
+      {mainTab === "TRADE" && selected && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
+          <div className="w-full max-w-md pointer-events-auto bg-gray-900 border-t border-gray-700 rounded-t-3xl px-4 pt-4 pb-8 space-y-3 shadow-2xl"
+            style={{ maxHeight: "85vh", overflowY: "auto" }}>
+            {/* 드래그 핸들 + 닫기 */}
+            <div className="flex items-center justify-between mb-1">
+              <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+              <div className="flex justify-between items-start w-full pt-2">
                 <div>
-                  <div className="font-bold text-white">{shortSelected.name}</div>
-                  <div className="text-sm text-gray-400">
-                    {shortSelected.market === "US" ? `$${shortSelected.price.toFixed(2)}` : `${shortSelected.price.toLocaleString()}원`}
+                  <div className="font-bold text-white">{selected.name}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-sm text-gray-400">
+                      {selected.market === "US" ? `$${selected.price.toFixed(2)}` : `${selected.price.toLocaleString()}원`}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${EXCHANGE_BADGE[selected.exchange] ?? "bg-gray-600 text-gray-300"}`}>{selected.exchange}</span>
                   </div>
                 </div>
+                <div className="flex items-center gap-3">
+                  {heldQty > 0 && <div className="text-right"><div className="text-xs text-gray-500">보유</div><div className="text-sm font-semibold text-white">{heldQty}주</div></div>}
+                  {currentMarketStatus && (
+                    <div className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
+                      currentMarketStatus.is_open ? "bg-green-500/20 text-green-400"
+                      : currentMarketStatus.status === "pre" ? "bg-yellow-500/20 text-yellow-400"
+                      : "bg-gray-700 text-gray-400"
+                    }`}>
+                      {currentMarketStatus.is_open ? "● 거래 가능" : currentMarketStatus.status === "pre" ? "● 장전" : "● 마감"}
+                    </div>
+                  )}
+                  <button onClick={() => setSelected(null)} className="text-gray-500 hover:text-gray-300 text-xl leading-none">✕</button>
+                </div>
+              </div>
+            </div>
+
+            {currentMarketStatus && !currentMarketStatus.is_open && (
+              <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 text-xs text-gray-400 text-center">
+                {currentMarketStatus.message}
+                <span className="text-gray-500 ml-1">개장: {currentMarketStatus.open_time} ~ {currentMarketStatus.close_time}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button onClick={() => { setTradeType("BUY"); setQuantity(1); }}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "BUY" ? "bg-red-500 text-white" : "bg-gray-700 text-gray-400"}`}>매수</button>
+              <button onClick={() => { setTradeType("SELL"); setQuantity(1); }}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${tradeType === "SELL" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-400"}`}>매도</button>
+            </div>
+
+            <div className="flex gap-2">
+              {[{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "전량", type: "all" as const }].map((btn) => (
+                <button key={btn.type} onClick={() => handleQuickQty(btn.type)} disabled={!isTradeAllowed}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={!isTradeAllowed}
+                className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">−</button>
+              <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                disabled={!isTradeAllowed} className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 text-center font-bold outline-none text-lg disabled:opacity-40" />
+              <button onClick={() => setQuantity(quantity + 1)} disabled={!isTradeAllowed}
+                className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">+</button>
+            </div>
+
+            <div className="bg-gray-700/50 rounded-xl px-4 py-3 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm">예상 금액</span>
+                <span className="text-white font-bold">
+                  {selected.market === "US" ? `$${(selected.price * quantity).toFixed(2)}` : `${(selected.price * quantity).toLocaleString()}원`}
+                </span>
+              </div>
+              {selected.market === "US" && usdKrw && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-xs">원화 환산 (₩{usdKrw.toLocaleString()})</span>
+                  <span className="text-gray-300 text-sm font-semibold">≈ {(selected.price * usdKrw * quantity).toLocaleString()}원</span>
+                </div>
+              )}
+            </div>
+
+            {message && (
+              <div className={`text-sm text-center py-2.5 rounded-xl font-medium ${
+                messageType === "success" ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
+              }`}>{message}</div>
+            )}
+
+            <button onClick={handleTrade} disabled={loading || !isTradeAllowed}
+              className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
+                !isTradeAllowed ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                : tradeType === "BUY" ? "bg-red-500 hover:bg-red-400 text-white"
+                : "bg-blue-500 hover:bg-blue-400 text-white"
+              } disabled:opacity-60`}>
+              {loading ? "처리 중..." : !isTradeAllowed ? "장 마감 (거래 불가)" : `${tradeType === "BUY" ? "매수" : "매도"} 확인`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 하단 고정 공매도 패널 ── */}
+      {mainTab === "SHORT" && shortSelected && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
+          <div className="w-full max-w-md pointer-events-auto bg-gray-900 border-t border-orange-500/40 rounded-t-3xl px-4 pt-4 pb-8 space-y-3 shadow-2xl"
+            style={{ maxHeight: "85vh", overflowY: "auto" }}>
+            <div className="flex items-center justify-between w-full pt-2">
+              <div>
+                <div className="font-bold text-white">{shortSelected.name}</div>
+                <div className="text-sm text-gray-400">
+                  {shortSelected.market === "US" ? `$${shortSelected.price.toFixed(2)}` : `${shortSelected.price.toLocaleString()}원`}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
                 {shortMarketStatus && (
                   <div className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
                     shortMarketStatus.is_open ? "bg-green-500/20 text-green-400" : "bg-gray-700 text-gray-400"
@@ -548,57 +563,64 @@ export default function TradePage() {
                     {shortMarketStatus.is_open ? "● 거래 가능" : "● 마감"}
                   </div>
                 )}
+                <button onClick={() => setShortSelected(null)} className="text-gray-500 hover:text-gray-300 text-xl leading-none">✕</button>
               </div>
-
-              {shortMarketStatus && !shortMarketStatus.is_open && (
-                <div className="bg-gray-700/50 rounded-xl px-4 py-3 text-xs text-gray-400 text-center">
-                  {shortMarketStatus.message}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {[{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "최대", type: "all" as const }].map((btn) => (
-                  <button key={btn.type} onClick={() => handleShortQuickQty(btn.type)} disabled={!isShortAllowed}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-40">
-                    {btn.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button onClick={() => setShortQty(Math.max(1, shortQty - 1))} disabled={!isShortAllowed}
-                  className="bg-gray-700 text-white w-11 h-11 rounded-xl font-bold text-xl disabled:opacity-40">−</button>
-                <input type="number" min={1} value={shortQty} onChange={(e) => setShortQty(Math.max(1, parseInt(e.target.value) || 1))}
-                  disabled={!isShortAllowed} className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 text-center font-bold outline-none text-lg disabled:opacity-40" />
-                <button onClick={() => setShortQty(shortQty + 1)} disabled={!isShortAllowed}
-                  className="bg-gray-700 text-white w-11 h-11 rounded-xl font-bold text-xl disabled:opacity-40">+</button>
-              </div>
-
-              <div className="bg-gray-700/50 rounded-xl px-4 py-3 space-y-1.5 text-xs">
-                {(() => {
-                  const p = priceKrw(shortSelected);
-                  const total = p * shortQty;
-                  const margin = total * 0.3;
-                  return (
-                    <>
-                      <div className="flex justify-between"><span className="text-gray-400">공매도 금액</span><span className="text-white font-semibold">{total.toLocaleString()}원</span></div>
-                      <div className="flex justify-between"><span className="text-orange-400">필요 증거금 (30%)</span><span className="text-orange-400 font-semibold">{margin.toLocaleString()}원</span></div>
-                      <div className="flex justify-between text-gray-600"><span>목표 (10% 하락 시)</span><span className="text-blue-400">+{(total * 0.1).toLocaleString()}원</span></div>
-                    </>
-                  );
-                })()}
-              </div>
-
-              <button onClick={handleShortOpen} disabled={shortLoading || !isShortAllowed}
-                className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
-                  !isShortAllowed ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                  : "bg-orange-500 hover:bg-orange-400 text-white"
-                } disabled:opacity-60`}>
-                {shortLoading ? "처리 중..." : !isShortAllowed ? "장 마감 (거래 불가)" : `📉 공매도 진입`}
-              </button>
             </div>
-          )}
-        </>
+
+            {shortMarketStatus && !shortMarketStatus.is_open && (
+              <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 text-xs text-gray-400 text-center">
+                {shortMarketStatus.message}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              {[{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "최대", type: "all" as const }].map((btn) => (
+                <button key={btn.type} onClick={() => handleShortQuickQty(btn.type)} disabled={!isShortAllowed}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-40">
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShortQty(Math.max(1, shortQty - 1))} disabled={!isShortAllowed}
+                className="bg-gray-700 text-white w-11 h-11 rounded-xl font-bold text-xl disabled:opacity-40">−</button>
+              <input type="number" min={1} value={shortQty} onChange={(e) => setShortQty(Math.max(1, parseInt(e.target.value) || 1))}
+                disabled={!isShortAllowed} className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 text-center font-bold outline-none text-lg disabled:opacity-40" />
+              <button onClick={() => setShortQty(shortQty + 1)} disabled={!isShortAllowed}
+                className="bg-gray-700 text-white w-11 h-11 rounded-xl font-bold text-xl disabled:opacity-40">+</button>
+            </div>
+
+            <div className="bg-gray-700/50 rounded-xl px-4 py-3 space-y-1.5 text-xs">
+              {(() => {
+                const p = priceKrw(shortSelected);
+                const total = p * shortQty;
+                const margin = total * 0.3;
+                return (
+                  <>
+                    <div className="flex justify-between"><span className="text-gray-400">공매도 금액</span><span className="text-white font-semibold">{total.toLocaleString()}원</span></div>
+                    <div className="flex justify-between"><span className="text-orange-400">필요 증거금 (30%)</span><span className="text-orange-400 font-semibold">{margin.toLocaleString()}원</span></div>
+                    <div className="flex justify-between text-gray-600"><span>목표 (10% 하락 시)</span><span className="text-blue-400">+{(total * 0.1).toLocaleString()}원</span></div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {shortMessage && (
+              <div className={`text-sm text-center py-2.5 rounded-xl font-medium ${
+                shortMessageType === "success" ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30"
+              }`}>{shortMessage}</div>
+            )}
+
+            <button onClick={handleShortOpen} disabled={shortLoading || !isShortAllowed}
+              className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
+                !isShortAllowed ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                : "bg-orange-500 hover:bg-orange-400 text-white"
+              } disabled:opacity-60`}>
+              {shortLoading ? "처리 중..." : !isShortAllowed ? "장 마감 (거래 불가)" : `📉 공매도 진입`}
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );
