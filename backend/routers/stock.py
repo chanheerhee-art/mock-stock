@@ -10,9 +10,10 @@ router = APIRouter(prefix="/stock", tags=["stock"])
 @router.get("/price/{ticker}")
 async def stock_price(ticker: str):
     """종목 현재가 조회"""
+    from fastapi import HTTPException
     info = await get_stock_price(ticker)
     if not info:
-        return {"error": "종목을 찾을 수 없습니다"}
+        raise HTTPException(status_code=404, detail=f"'{ticker}' 종목을 찾을 수 없습니다")
     return info
 
 

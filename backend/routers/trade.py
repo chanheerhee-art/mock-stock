@@ -32,11 +32,12 @@ class TradeRequest(BaseModel):
     ticker: str
     quantity: int
     market: Optional[str] = "KR"
+    limit_price: Optional[float] = None  # 지정가 (원화 기준), None이면 시장가
 
 
 @router.post("/buy")
 async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """주식 매수 (미국주식은 원화 환산)"""
+    """주식 매수 (미국주식은 원화 환산, 지정가 지원)"""
     if req.quantity <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다")
 
@@ -54,15 +55,29 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
     # 미국주식은 원화로 환산해서 거래 (시드머니가 원화이므로)
     if is_us:
         usd_krw = await get_usd_krw()
-        price_krw = price_info["price"] * usd_krw
+        market_price_krw = price_info["price"] * usd_krw
     else:
-        price_krw = price_info["price"]
+        market_price_krw = price_info["price"]
         usd_krw = None
+
+    # 지정가 vs 시장가
+    if req.limit_price is not None:
+        if req.limit_price <= 0:
+            raise HTTPException(status_code=400, detail="지정가는 0보다 커야 합니다")
+        # 지정가 매수: 지정가가 현재가보다 낮으면 체결 불가 (실제 거래소와 동일 로직 단순화)
+        if req.limit_price < market_price_krw * 0.85:
+            raise HTTPException(status_code=400, detail=f"지정가({req.limit_price:,.0f}원)가 현재가({market_price_krw:,.0f}원)보다 너무 낮아 체결되지 않습니다")
+        price_krw = req.limit_price
+        order_note = f"지정가 {price_krw:,.0f}원"
+    else:
+        price_krw = market_price_krw
+        order_note = "시장가"
 
     total_cost = price_krw * req.quantity
 
     if user.cash < total_cost:
-        raise HTTPException(status_code=400, detail=f"잔액이 부족합니다 (필요: {total_cost:,.0f}원, 보유: {user.cash:,.0f}원)")
+        short = total_cost - user.cash
+        raise HTTPException(status_code=400, detail=f"잔액 부족 (필요 {total_cost:,.0f}원 / 보유 {user.cash:,.0f}원 / {short:,.0f}원 부족)")
 
     result = await db.execute(
         select(Portfolio).where(Portfolio.user_id == user.id, Portfolio.ticker == req.ticker)
@@ -101,7 +116,7 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
     db.add(history)
     await db.commit()
 
-    msg = f"{price_info['name']} {req.quantity}주 매수 완료!"
+    msg = f"{price_info['name']} {req.quantity}주 매수 완료! ({order_note})"
     if is_us:
         msg += f" (${price_info['price']:.2f} × {usd_krw:,.0f}원)"
 
@@ -117,7 +132,7 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
 
 @router.post("/sell")
 async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """주식 매도 (미국주식은 원화 환산)"""
+    """주식 매도 (미국주식은 원화 환산, 지정가 지원)"""
     if req.quantity <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다")
 
@@ -131,21 +146,36 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
     )
     portfolio = result.scalar_one_or_none()
 
-    if not portfolio or portfolio.quantity < req.quantity:
-        raise HTTPException(status_code=400, detail="보유 수량이 부족합니다")
+    if not portfolio:
+        raise HTTPException(status_code=400, detail=f"{req.ticker} 종목을 보유하고 있지 않습니다")
+    if portfolio.quantity < req.quantity:
+        raise HTTPException(status_code=400, detail=f"보유 수량 부족 (보유 {portfolio.quantity}주 / 매도 요청 {req.quantity}주)")
 
     price_info = await get_stock_price(req.ticker)
     if not price_info:
-        raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail="종목 시세를 불러올 수 없습니다")
 
     is_us = price_info["market"] == "US"
 
     if is_us:
         usd_krw = await get_usd_krw()
-        price_krw = price_info["price"] * usd_krw
+        market_price_krw = price_info["price"] * usd_krw
     else:
-        price_krw = price_info["price"]
+        market_price_krw = price_info["price"]
         usd_krw = None
+
+    # 지정가 vs 시장가
+    if req.limit_price is not None:
+        if req.limit_price <= 0:
+            raise HTTPException(status_code=400, detail="지정가는 0보다 커야 합니다")
+        # 지정가 매도: 지정가가 현재가보다 너무 높으면 체결 불가
+        if req.limit_price > market_price_krw * 1.15:
+            raise HTTPException(status_code=400, detail=f"지정가({req.limit_price:,.0f}원)가 현재가({market_price_krw:,.0f}원)보다 너무 높아 체결되지 않습니다")
+        price_krw = req.limit_price
+        order_note = f"지정가 {price_krw:,.0f}원"
+    else:
+        price_krw = market_price_krw
+        order_note = "시장가"
 
     total_revenue = price_krw * req.quantity
 
@@ -168,7 +198,7 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
     db.add(history)
     await db.commit()
 
-    msg = f"{price_info['name']} {req.quantity}주 매도 완료!"
+    msg = f"{price_info['name']} {req.quantity}주 매도 완료! ({order_note})"
     if is_us:
         msg += f" (${price_info['price']:.2f} × {usd_krw:,.0f}원)"
 
