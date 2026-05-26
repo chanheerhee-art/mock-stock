@@ -29,36 +29,43 @@ export default function PortfolioPage() {
   }, [router]);
 
   if (loading) return (
-    <main className="flex items-center justify-center min-h-screen">
+    <main className="flex items-center justify-center min-h-screen" style={{background: "#0f0f0f"}}>
       <div className="text-4xl animate-bounce">📊</div>
     </main>
   );
 
   return (
-    <main className="max-w-md mx-auto px-4 py-6 space-y-4">
+    <main className="max-w-md mx-auto px-4 py-6 space-y-4" style={{background: "#0f0f0f", minHeight: "100vh"}}>
       <div className="flex items-center justify-between">
-        <Link href="/dashboard" className="text-gray-400 text-sm">← 홈</Link>
-        <h1 className="font-bold text-lg">📊 거래 내역</h1>
-        <div />
+        <Link href="/dashboard" className="text-gray-400 text-sm hover:text-white transition-colors">← 홈</Link>
+        <h1 className="font-bold text-lg text-white">📊 거래 내역</h1>
+        <div className="w-10" />
       </div>
 
       {history.length === 0 ? (
-        <div className="bg-gray-800 rounded-2xl p-8 text-center text-gray-500 text-sm">
-          거래 내역이 없습니다.<br />
-          <Link href="/trade" className="text-yellow-400 mt-2 block">거래하러 가기 →</Link>
+        <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 text-center space-y-3">
+          <div className="text-3xl">📭</div>
+          <p className="text-gray-500 text-sm">거래 내역이 없어요</p>
+          <Link href="/trade" className="inline-block text-yellow-400 text-sm font-medium">
+            거래하러 가기 →
+          </Link>
         </div>
       ) : (
         <div className="space-y-2">
           {history.map((h, i) => (
-            <div key={i} className="bg-gray-800 rounded-2xl p-4 flex justify-between items-center">
-              <div>
+            <div key={i} className="bg-gray-800 border border-gray-700 rounded-2xl p-4 flex justify-between items-center">
+              <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${h.trade_type === "BUY" ? "bg-red-500/20 text-red-400" : "bg-blue-500/20 text-blue-400"}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    h.trade_type === "BUY"
+                      ? "bg-red-500/20 text-red-400"
+                      : "bg-blue-500/20 text-blue-400"
+                  }`}>
                     {h.trade_type === "BUY" ? "매수" : "매도"}
                   </span>
-                  <span className="font-medium text-sm">{h.name}</span>
+                  <span className="font-semibold text-sm text-white">{h.name}</span>
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-gray-400">
                   {h.quantity}주 · {h.price.toLocaleString()}원
                 </div>
                 <div className="text-xs text-gray-600">
@@ -66,7 +73,7 @@ export default function PortfolioPage() {
                 </div>
               </div>
               <div className="text-right">
-                <div className={`text-sm font-semibold ${h.trade_type === "BUY" ? "text-red-400" : "text-blue-400"}`}>
+                <div className={`text-sm font-bold ${h.trade_type === "BUY" ? "text-red-400" : "text-blue-400"}`}>
                   {h.trade_type === "BUY" ? "-" : "+"}{h.total.toLocaleString()}원
                 </div>
               </div>
