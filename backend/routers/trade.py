@@ -6,6 +6,7 @@ from typing import Optional
 
 from models.database import get_db, User, Portfolio, TradeHistory, TradeType
 from services.stock import get_stock_price
+from services.market_hours import get_market_status
 from services.auth import decode_jwt
 
 router = APIRouter(prefix="/trade", tags=["trade"])
@@ -37,6 +38,12 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
     """주식 매수"""
     if req.quantity <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다")
+
+    # 장시간 체크
+    market = req.market or "KR"
+    status = get_market_status(market)
+    if not status["is_open"]:
+        raise HTTPException(status_code=403, detail=f"장이 열려있지 않습니다. {status['message']}")
 
     price_info = await get_stock_price(req.ticker)
     if not price_info:
@@ -97,6 +104,12 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
     """주식 매도"""
     if req.quantity <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다")
+
+    # 장시간 체크
+    market = req.market or "KR"
+    status = get_market_status(market)
+    if not status["is_open"]:
+        raise HTTPException(status_code=403, detail=f"장이 열려있지 않습니다. {status['message']}")
 
     result = await db.execute(
         select(Portfolio).where(Portfolio.user_id == user.id, Portfolio.ticker == req.ticker)
