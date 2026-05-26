@@ -580,34 +580,67 @@ async def search_yahoo(query: str) -> list:
         return []
 
 
+def search_ko_name(query: str) -> list[str]:
+    """한글 쿼리로 US_NAME_KO 역방향 검색 → 매칭 ticker 목록 반환 (최대 6개)
+    우선순위: 이름 시작 일치 > 단어 경계 일치 > 포함
+    """
+    q = query.strip().lower()
+    if not q:
+        return []
+
+    exact_start, word_match, contains = [], [], []
+    for ticker, name in US_NAME_KO.items():
+        n = name.lower()
+        if n.startswith(q):
+            exact_start.append(ticker)
+        elif any(part.startswith(q) for part in n.replace("(", " ").replace(")", " ").split()):
+            word_match.append(ticker)
+        elif q in n:
+            contains.append(ticker)
+
+    result = exact_start + word_match + contains
+    return result[:6]
+
+
 async def search_stock(query: str, market: str = "ALL") -> list:
-    """종목 검색 - 네이버/Yahoo API 직접 호출"""
+    """종목 검색 - 네이버/Yahoo API 직접 호출 + 한글 이름 역방향 매핑"""
     import asyncio
 
     query = query.strip()
     if not query:
         return []
 
+    # 한글 포함 여부 체크
+    has_korean = any("가" <= c <= "힣" for c in query)
+
     tasks = []
     if market in ("ALL", "KR"):
         tasks.append(search_naver(query))
-    if market in ("ALL", "US"):
+    # 영어이거나 ALL/US 모드면 Yahoo 검색
+    if market in ("ALL", "US") and not has_korean:
         tasks.append(search_yahoo(query))
 
     search_results = await asyncio.gather(*tasks)
 
-    # 가격 조회 병렬 실행
     price_tasks = []
 
+    # KR 결과
     if market in ("ALL", "KR") and search_results:
-        kr_results = search_results[0] if market == "ALL" else search_results[0]
-        for item in (kr_results if market in ("ALL", "KR") else []):
+        kr_results = search_results[0]
+        for item in kr_results:
             price_tasks.append(get_naver_price(item["code"]))
 
-    if market in ("ALL", "US"):
-        us_results = search_results[-1]
+    # US 결과 (영어 검색)
+    if market in ("ALL", "US") and not has_korean:
+        us_results = search_results[-1] if search_results else []
         for item in us_results:
             price_tasks.append(get_yahoo_price(item["symbol"]))
+
+    # 한글 검색 → US_NAME_KO 역방향 매핑으로 미국 주식도 검색
+    if has_korean and market in ("ALL", "US"):
+        ko_tickers = search_ko_name(query)
+        for ticker in ko_tickers:
+            price_tasks.append(get_yahoo_price(ticker))
 
     prices = await asyncio.gather(*price_tasks)
     return [p for p in prices if p is not None]
