@@ -98,11 +98,12 @@ export default function Dashboard() {
       </div>
 
       {/* 빠른 메뉴 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-2">
         {[
           { href: "/trade", icon: "💹", label: "거래하기" },
           { href: "/ranking", icon: "🏆", label: "랭킹" },
-          { href: "/portfolio", icon: "📊", label: "거래내역" },
+          { href: "/history", icon: "📅", label: "시즌기록" },
+          { href: "/portfolio", icon: "📋", label: "거래내역" },
         ].map((menu) => (
           <Link
             key={menu.href}
