@@ -16,6 +16,8 @@ interface StockInfo {
   change_pct: number;
   market: string;
   exchange: string;
+  pre_price?: number | null;
+  after_price?: number | null;
 }
 
 interface ChartPoint {
@@ -29,6 +31,7 @@ interface ChartPoint {
 interface MarketStatusInfo {
   is_open: boolean;
   status: "open" | "closed" | "pre" | "after";
+  session: "regular" | "pre" | "after" | "closed";
   message: string;
   open_time: string;
   close_time: string;
@@ -81,7 +84,17 @@ export default function StockDetailPage() {
   const isUS = stock?.market === "US";
   const isTradeAllowed = marketStatus?.is_open ?? false;
   const heldQty = myInfo?.holdings.find(h => h.ticker === ticker)?.quantity ?? 0;
-  const priceKrw = stock ? (isUS && usdKrw ? stock.price * usdKrw : stock.price) : 0;
+
+  // 세션별 가격 (프리/애프터마켓)
+  const session = marketStatus?.session ?? "regular";
+  const sessionPriceUsd = isUS && stock
+    ? (session === "pre" && stock.pre_price ? stock.pre_price
+      : session === "after" && stock.after_price ? stock.after_price
+      : stock.price)
+    : stock?.price ?? 0;
+  const sessionLabel = session === "pre" ? "프리마켓" : session === "after" ? "애프터마켓" : "현재가";
+
+  const priceKrw = stock ? (isUS && usdKrw ? (sessionPriceUsd ?? stock.price) * usdKrw : stock.price) : 0;
 
   const fetchChart = useCallback(async (p: string) => {
     setChartLoading(true);
@@ -224,13 +237,30 @@ export default function StockDetailPage() {
 
           <div className="flex items-end gap-3">
             <div>
-              <div className="text-3xl font-bold text-white">
-                {isUS ? `$${stock.price.toFixed(2)}` : `${stock.price.toLocaleString()}원`}
+              <div className="flex items-center gap-2">
+                <div className="text-3xl font-bold text-white">
+                  {isUS ? `$${stock.price.toFixed(2)}` : `${stock.price.toLocaleString()}원`}
+                </div>
+                {isUS && session !== "regular" && (
+                  <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold ${
+                    session === "pre" ? "bg-yellow-500/20 text-yellow-400" : "bg-purple-500/20 text-purple-400"
+                  }`}>
+                    {session === "pre" ? "🌅 프리" : "🌙 애프터"}
+                  </span>
+                )}
               </div>
               {isUS && priceKrwDisplay && (
                 <div className="text-sm text-gray-400 mt-0.5">
                   ≈ {priceKrwDisplay.toLocaleString()}원
                   <span className="text-gray-600 ml-1">(₩{usdKrw?.toLocaleString()})</span>
+                </div>
+              )}
+              {isUS && session !== "regular" && sessionPriceUsd && sessionPriceUsd !== stock.price && (
+                <div className={`text-sm font-semibold mt-0.5 ${
+                  session === "pre" ? "text-yellow-400" : "text-purple-400"
+                }`}>
+                  {sessionLabel} ${sessionPriceUsd.toFixed(2)}
+                  {usdKrw && <span className="text-xs text-gray-500 ml-1">≈ {(sessionPriceUsd * usdKrw).toLocaleString()}원</span>}
                 </div>
               )}
             </div>
@@ -361,9 +391,19 @@ export default function StockDetailPage() {
                 <div>
                   <div className="font-bold text-white text-base">{stock.name}</div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-sm text-gray-400">
-                      {isUS ? `$${stock.price.toFixed(2)}` : `${stock.price.toLocaleString()}원`}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-400">
+                        {isUS ? `$${(sessionPriceUsd ?? stock.price).toFixed(2)}` : `${stock.price.toLocaleString()}원`}
+                        {isUS && session !== "regular" && (
+                          <span className={`ml-1 text-xs px-1.5 py-0.5 rounded font-semibold ${
+                            session === "pre" ? "bg-yellow-500/20 text-yellow-400" : "bg-purple-500/20 text-purple-400"
+                          }`}>{sessionLabel}</span>
+                        )}
+                      </span>
+                      {isUS && session !== "regular" && stock.price !== (sessionPriceUsd ?? stock.price) && (
+                        <span className="text-xs text-gray-600">정규장 ${stock.price.toFixed(2)}</span>
+                      )}
+                    </div>
                     <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${EXCHANGE_BADGE[stock.exchange] ?? "bg-gray-600 text-gray-300"}`}>
                       {stock.exchange}
                     </span>
@@ -378,11 +418,15 @@ export default function StockDetailPage() {
                   )}
                   {marketStatus && (
                     <div className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
-                      marketStatus.is_open ? "bg-green-500/20 text-green-400"
-                      : marketStatus.status === "pre" ? "bg-yellow-500/20 text-yellow-400"
+                      session === "pre" ? "bg-yellow-500/20 text-yellow-400"
+                      : session === "after" ? "bg-purple-500/20 text-purple-400"
+                      : marketStatus.is_open ? "bg-green-500/20 text-green-400"
                       : "bg-gray-700 text-gray-400"
                     }`}>
-                      {marketStatus.is_open ? "● 거래 가능" : marketStatus.status === "pre" ? "● 장전" : "● 마감"}
+                      {session === "pre" ? "● 프리마켓"
+                        : session === "after" ? "● 애프터마켓"
+                        : marketStatus.is_open ? "● 거래 가능"
+                        : "● 마감"}
                     </div>
                   )}
                   <button onClick={() => setShowTrade(false)} className="text-gray-500 hover:text-gray-300 text-xl">✕</button>
@@ -436,13 +480,13 @@ export default function StockDetailPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">예상 금액</span>
                   <span className="text-white font-bold">
-                    {isUS ? `$${(stock.price * quantity).toFixed(2)}` : `${(stock.price * quantity).toLocaleString()}원`}
+                    {isUS ? `$${((sessionPriceUsd ?? stock.price) * quantity).toFixed(2)}` : `${(stock.price * quantity).toLocaleString()}원`}
                   </span>
                 </div>
                 {isUS && usdKrw && (
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-xs">원화 환산 (₩{usdKrw.toLocaleString()})</span>
-                    <span className="text-gray-300 text-sm font-semibold">≈ {(stock.price * usdKrw * quantity).toLocaleString()}원</span>
+                    <span className="text-gray-600 text-xs">{sessionLabel} 원화 환산</span>
+                    <span className="text-gray-300 text-sm font-semibold">≈ {((sessionPriceUsd ?? stock.price) * usdKrw * quantity).toLocaleString()}원</span>
                   </div>
                 )}
                 {myInfo && (

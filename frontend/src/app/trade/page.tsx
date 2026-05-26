@@ -13,6 +13,8 @@ interface StockInfo {
   change_pct: number;
   market: string;
   exchange: string;
+  pre_price?: number | null;
+  after_price?: number | null;
 }
 
 interface PortfolioInfo {
@@ -37,6 +39,7 @@ interface ShortPosition {
 interface MarketStatusInfo {
   is_open: boolean;
   status: "open" | "closed" | "pre" | "after";
+  session: "regular" | "pre" | "after" | "closed";
   message: string;
   open_time: string;
   close_time: string;
@@ -85,18 +88,25 @@ function Toast({ message, type }: ToastProps) {
 // ── 서브 컴포넌트 ──────────────────────────────────────────
 
 function MarketStatusBanner({ status }: { status: MarketStatusInfo }) {
-  const isOpen = status.is_open;
-  const isPre = status.status === "pre";
+  const { is_open: isOpen, session } = status;
+  const isPre = session === "pre";
+  const isAfter = session === "after";
+  const isRegular = session === "regular";
+
+  const colorClass = isRegular ? "bg-green-500/10 border-green-500/30 text-green-400"
+    : isPre ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+    : isAfter ? "bg-purple-500/10 border-purple-500/30 text-purple-400"
+    : "bg-gray-800 border-gray-700 text-gray-400";
+
+  const dotClass = isRegular ? "bg-green-400 animate-pulse"
+    : isPre ? "bg-yellow-400 animate-pulse"
+    : isAfter ? "bg-purple-400 animate-pulse"
+    : "bg-gray-600";
+
   return (
-    <div className={`rounded-xl px-4 py-2.5 flex items-center justify-between text-xs font-medium border ${
-      isOpen ? "bg-green-500/10 border-green-500/30 text-green-400"
-      : isPre ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
-      : "bg-gray-800 border-gray-700 text-gray-400"
-    }`}>
+    <div className={`rounded-xl px-4 py-2.5 flex items-center justify-between text-xs font-medium border ${colorClass}`}>
       <span>{status.message}</span>
-      <span className={`w-2 h-2 rounded-full ml-2 flex-shrink-0 ${
-        isOpen ? "bg-green-400 animate-pulse" : isPre ? "bg-yellow-400" : "bg-gray-600"
-      }`} />
+      <span className={`w-2 h-2 rounded-full ml-2 flex-shrink-0 ${dotClass}`} />
     </div>
   );
 }
@@ -127,7 +137,17 @@ function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, 
   const isUS = stock.market === "US";
   const isTradeAllowed = marketStatus?.is_open ?? false;
   const heldQty = myInfo?.holdings.find(h => h.ticker === stock.ticker)?.quantity ?? 0;
-  const unitPriceKrw = isUS && usdKrw ? stock.price * usdKrw : stock.price;
+
+  // 세션별 가격 선택 (프리/애프터마켓)
+  const session = marketStatus?.session ?? "regular";
+  const sessionPriceUsd = isUS
+    ? (session === "pre" && stock.pre_price ? stock.pre_price
+      : session === "after" && stock.after_price ? stock.after_price
+      : stock.price)
+    : null;
+  const sessionLabel = session === "pre" ? "프리마켓" : session === "after" ? "애프터마켓" : "현재가";
+
+  const unitPriceKrw = isUS && usdKrw ? (sessionPriceUsd ?? stock.price) * usdKrw : stock.price;
   const execPrice = orderType === "LIMIT" ? limitPrice : unitPriceKrw;
   const totalKrw = execPrice * quantity;
   const cashShort = myInfo ? Math.max(0, (tradeType === "BUY" ? totalKrw : 0) - myInfo.cash) : 0;
@@ -180,9 +200,21 @@ function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, 
             <div>
               <div className="font-bold text-white text-base">{stock.name}</div>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-sm text-gray-400">
-                  {isUS ? `$${stock.price.toFixed(2)}` : `${stock.price.toLocaleString()}원`}
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-400">
+                    {isUS
+                      ? `$${(sessionPriceUsd ?? stock.price).toFixed(2)}`
+                      : `${stock.price.toLocaleString()}원`}
+                    {isUS && session !== "regular" && (
+                      <span className={`ml-1 text-xs px-1.5 py-0.5 rounded font-semibold ${
+                        session === "pre" ? "bg-yellow-500/20 text-yellow-400" : "bg-purple-500/20 text-purple-400"
+                      }`}>{sessionLabel}</span>
+                    )}
+                  </span>
+                  {isUS && session !== "regular" && stock.price !== (sessionPriceUsd ?? stock.price) && (
+                    <span className="text-xs text-gray-600">정규장 ${stock.price.toFixed(2)}</span>
+                  )}
+                </div>
                 <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${EXCHANGE_BADGE[stock.exchange] ?? "bg-gray-600 text-gray-300"}`}>
                   {stock.exchange}
                 </span>
@@ -198,11 +230,15 @@ function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, 
               )}
               {marketStatus && (
                 <div className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
-                  marketStatus.is_open ? "bg-green-500/20 text-green-400"
-                  : marketStatus.status === "pre" ? "bg-yellow-500/20 text-yellow-400"
+                  session === "pre" ? "bg-yellow-500/20 text-yellow-400"
+                  : session === "after" ? "bg-purple-500/20 text-purple-400"
+                  : marketStatus.is_open ? "bg-green-500/20 text-green-400"
                   : "bg-gray-700 text-gray-400"
                 }`}>
-                  {marketStatus.is_open ? "● 거래 가능" : marketStatus.status === "pre" ? "● 장전" : "● 마감"}
+                  {session === "pre" ? "● 프리마켓"
+                    : session === "after" ? "● 애프터마켓"
+                    : marketStatus.is_open ? "● 거래 가능"
+                    : "● 마감"}
                 </div>
               )}
               <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-xl">✕</button>
@@ -253,7 +289,7 @@ function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, 
                   className="bg-gray-700 text-white w-9 h-9 rounded-lg font-bold text-base">+</button>
               </div>
               <div className="text-xs text-gray-500 mt-1.5 text-center">
-                현재가 {isUS ? `$${stock.price.toFixed(2)} (≈${Math.round(unitPriceKrw).toLocaleString()}원)` : `${stock.price.toLocaleString()}원`}
+                {sessionLabel} {isUS ? `$${(sessionPriceUsd ?? stock.price).toFixed(2)} (≈${Math.round(unitPriceKrw).toLocaleString()}원)` : `${stock.price.toLocaleString()}원`}
                 {(limitPrice < unitPriceKrw * 0.9 || limitPrice > unitPriceKrw * 1.1) &&
                   <span className="text-yellow-500 ml-1">⚠ 현재가와 10% 이상 차이</span>}
               </div>
@@ -290,8 +326,8 @@ function TradeBottomSheet({ stock, usdKrw, myInfo: initialMyInfo, marketStatus, 
             </div>
             {isUS && usdKrw && orderType === "MARKET" && (
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-xs">달러 기준</span>
-                <span className="text-gray-400 text-xs">${(stock.price * quantity).toFixed(2)}</span>
+                <span className="text-gray-600 text-xs">{sessionLabel} 달러</span>
+                <span className="text-gray-400 text-xs">${((sessionPriceUsd ?? stock.price) * quantity).toFixed(2)}</span>
               </div>
             )}
             {myInfo && (

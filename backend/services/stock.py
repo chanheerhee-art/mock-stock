@@ -516,6 +516,10 @@ async def get_yahoo_price(ticker: str) -> Optional[dict]:
             eng_name = meta.get("longName") or meta.get("shortName", ticker)
             name = US_NAME_KO.get(ticker.upper(), eng_name)
 
+            # 프리/애프터 마켓 가격
+            pre_price = meta.get("preMarketPrice")
+            after_price = meta.get("postMarketPrice")
+
             result = {
                 "ticker": ticker,
                 "name": name,
@@ -524,6 +528,8 @@ async def get_yahoo_price(ticker: str) -> Optional[dict]:
                 "change_pct": change_pct,
                 "market": "US",
                 "exchange": exchange,
+                "pre_price": pre_price,
+                "after_price": after_price,
             }
             _cache_set(cache_key, result)
             return result

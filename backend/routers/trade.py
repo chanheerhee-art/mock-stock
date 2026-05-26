@@ -55,10 +55,23 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
     # 미국주식은 원화로 환산해서 거래 (시드머니가 원화이므로)
     if is_us:
         usd_krw = await get_usd_krw()
-        market_price_krw = price_info["price"] * usd_krw
+        session = status.get("session", "regular")
+        # 프리/애프터마켓 세션 전용 가격 사용
+        if session == "pre" and price_info.get("pre_price"):
+            raw_price_usd = price_info["pre_price"]
+            session_label = "프리마켓"
+        elif session == "after" and price_info.get("after_price"):
+            raw_price_usd = price_info["after_price"]
+            session_label = "애프터마켓"
+        else:
+            raw_price_usd = price_info["price"]
+            session_label = "정규장"
+        market_price_krw = raw_price_usd * usd_krw
     else:
         market_price_krw = price_info["price"]
+        raw_price_usd = None
         usd_krw = None
+        session_label = "정규장"
 
     # 지정가 vs 시장가
     if req.limit_price is not None:
@@ -118,15 +131,16 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
 
     msg = f"{price_info['name']} {req.quantity}주 매수 완료! ({order_note})"
     if is_us:
-        msg += f" (${price_info['price']:.2f} × {usd_krw:,.0f}원)"
+        msg += f" (${raw_price_usd:.2f} × {usd_krw:,.0f}원, {session_label})"
 
     return {
         "message": msg,
         "price": price_krw,
-        "price_usd": price_info["price"] if is_us else None,
+        "price_usd": raw_price_usd if is_us else None,
         "usd_krw": usd_krw,
         "total": total_cost,
         "remaining_cash": user.cash,
+        "session": session_label,
     }
 
 
@@ -159,10 +173,22 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
 
     if is_us:
         usd_krw = await get_usd_krw()
-        market_price_krw = price_info["price"] * usd_krw
+        session = status.get("session", "regular")
+        if session == "pre" and price_info.get("pre_price"):
+            raw_price_usd = price_info["pre_price"]
+            session_label = "프리마켓"
+        elif session == "after" and price_info.get("after_price"):
+            raw_price_usd = price_info["after_price"]
+            session_label = "애프터마켓"
+        else:
+            raw_price_usd = price_info["price"]
+            session_label = "정규장"
+        market_price_krw = raw_price_usd * usd_krw
     else:
         market_price_krw = price_info["price"]
+        raw_price_usd = None
         usd_krw = None
+        session_label = "정규장"
 
     # 지정가 vs 시장가
     if req.limit_price is not None:
@@ -200,15 +226,16 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
 
     msg = f"{price_info['name']} {req.quantity}주 매도 완료! ({order_note})"
     if is_us:
-        msg += f" (${price_info['price']:.2f} × {usd_krw:,.0f}원)"
+        msg += f" (${raw_price_usd:.2f} × {usd_krw:,.0f}원, {session_label})"
 
     return {
         "message": msg,
         "price": price_krw,
-        "price_usd": price_info["price"] if is_us else None,
+        "price_usd": raw_price_usd if is_us else None,
         "usd_krw": usd_krw,
         "total": total_revenue,
         "remaining_cash": user.cash,
+        "session": session_label,
     }
 
 
