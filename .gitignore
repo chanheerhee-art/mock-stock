@@ -1,0 +1,18 @@
+# 환경변수 (절대 올리면 안됨!)
+backend/.env
+frontend/.env.local
+
+# 가상환경
+backend/venv/
+
+# DB 파일
+backend/*.db
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
