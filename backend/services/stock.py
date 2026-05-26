@@ -18,8 +18,10 @@ async def get_naver_price(ticker: str) -> Optional[dict]:
             resp.raise_for_status()
             data = resp.json()
 
-        exchange_code = data.get("stockExchangeType", {}).get("code", "KOSPI")
-        exchange = "KOSDAQ" if exchange_code == "KOSDAQ" else "KOSPI"
+        exchange_type = data.get("stockExchangeType", {})
+        exchange_code = exchange_type.get("code", "KS")
+        # Naver API: KOSPI = "KS", KOSDAQ = "KQ"
+        exchange = "KOSDAQ" if exchange_code == "KQ" else "KOSPI"
 
         return {
             "ticker": ticker,
