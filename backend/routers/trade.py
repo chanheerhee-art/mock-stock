@@ -38,7 +38,7 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
     if req.quantity <= 0:
         raise HTTPException(status_code=400, detail="수량은 1 이상이어야 합니다")
 
-    price_info = get_stock_price(req.ticker)
+    price_info = await get_stock_price(req.ticker)
     if not price_info:
         raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다")
 
@@ -106,7 +106,7 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
     if not portfolio or portfolio.quantity < req.quantity:
         raise HTTPException(status_code=400, detail="보유 수량이 부족합니다")
 
-    price_info = get_stock_price(req.ticker)
+    price_info = await get_stock_price(req.ticker)
     if not price_info:
         raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다")
 

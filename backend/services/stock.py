@@ -1,86 +1,124 @@
-import yfinance as yf
 import httpx
 from typing import Optional
 
-# 인기 한국 종목 목록
+# 인기 한국 종목
 KR_POPULAR = [
-    {"ticker": "005930.KS", "name": "삼성전자"},
-    {"ticker": "000660.KS", "name": "SK하이닉스"},
-    {"ticker": "035420.KS", "name": "NAVER"},
-    {"ticker": "035720.KS", "name": "카카오"},
-    {"ticker": "005380.KS", "name": "현대차"},
-    {"ticker": "051910.KS", "name": "LG화학"},
-    {"ticker": "006400.KS", "name": "삼성SDI"},
-    {"ticker": "028260.KS", "name": "삼성물산"},
-    {"ticker": "096770.KS", "name": "SK이노베이션"},
-    {"ticker": "003550.KS", "name": "LG"},
+    {"ticker": "005930", "name": "삼성전자", "market": "KR"},
+    {"ticker": "000660", "name": "SK하이닉스", "market": "KR"},
+    {"ticker": "035420", "name": "NAVER", "market": "KR"},
+    {"ticker": "035720", "name": "카카오", "market": "KR"},
+    {"ticker": "005380", "name": "현대차", "market": "KR"},
+    {"ticker": "051910", "name": "LG화학", "market": "KR"},
+    {"ticker": "006400", "name": "삼성SDI", "market": "KR"},
+    {"ticker": "003550", "name": "LG", "market": "KR"},
+    {"ticker": "096770", "name": "SK이노베이션", "market": "KR"},
+    {"ticker": "068270", "name": "셀트리온", "market": "KR"},
 ]
 
-# 인기 미국 종목 목록
+# 인기 미국 종목
 US_POPULAR = [
-    {"ticker": "AAPL", "name": "애플"},
-    {"ticker": "MSFT", "name": "마이크로소프트"},
-    {"ticker": "NVDA", "name": "엔비디아"},
-    {"ticker": "GOOGL", "name": "알파벳"},
-    {"ticker": "AMZN", "name": "아마존"},
-    {"ticker": "META", "name": "메타"},
-    {"ticker": "TSLA", "name": "테슬라"},
-    {"ticker": "AVGO", "name": "브로드컴"},
-    {"ticker": "JPM", "name": "JP모건"},
-    {"ticker": "V", "name": "비자"},
+    {"ticker": "AAPL", "name": "애플", "market": "US"},
+    {"ticker": "MSFT", "name": "마이크로소프트", "market": "US"},
+    {"ticker": "NVDA", "name": "엔비디아", "market": "US"},
+    {"ticker": "GOOGL", "name": "알파벳", "market": "US"},
+    {"ticker": "AMZN", "name": "아마존", "market": "US"},
+    {"ticker": "META", "name": "메타", "market": "US"},
+    {"ticker": "TSLA", "name": "테슬라", "market": "US"},
+    {"ticker": "AVGO", "name": "브로드컴", "market": "US"},
+    {"ticker": "JPM", "name": "JP모건", "market": "US"},
+    {"ticker": "V", "name": "비자", "market": "US"},
 ]
 
+ALL_STOCKS = KR_POPULAR + US_POPULAR
 
-def get_stock_price(ticker: str) -> Optional[dict]:
-    """yfinance로 현재가 조회"""
+
+async def get_kr_price(ticker: str) -> Optional[dict]:
+    """네이버 금융에서 한국 주가 조회"""
     try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="2d")
-        if hist.empty:
-            return None
+        url = f"https://m.stock.naver.com/api/stock/{ticker}/basic"
+        headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
 
-        current_price = float(hist["Close"].iloc[-1])
-        prev_price = float(hist["Close"].iloc[-2]) if len(hist) > 1 else current_price
-        change = current_price - prev_price
-        change_pct = (change / prev_price) * 100 if prev_price else 0
-
-        info = stock.info
-        name = info.get("longName") or info.get("shortName") or ticker
+        current_price = float(data.get("closePrice", "0").replace(",", ""))
+        change = float(data.get("compareToPreviousClosePrice", "0").replace(",", ""))
+        change_pct = float(data.get("fluctuationsRatio", "0"))
+        name = data.get("stockName", ticker)
 
         return {
             "ticker": ticker,
             "name": name,
-            "price": round(current_price, 2),
-            "change": round(change, 2),
-            "change_pct": round(change_pct, 2),
-            "market": "KR" if ".KS" in ticker or ".KQ" in ticker else "US",
+            "price": current_price,
+            "change": change,
+            "change_pct": change_pct,
+            "market": "KR",
         }
     except Exception as e:
-        print(f"주가 조회 오류 ({ticker}): {e}")
+        print(f"한국 주가 조회 오류 ({ticker}): {e}")
         return None
 
 
-def search_stock(query: str, market: str = "ALL") -> list:
-    """종목 검색"""
-    results = []
-    pool = []
+async def get_us_price(ticker: str) -> Optional[dict]:
+    """네이버 금융에서 미국 주가 조회"""
+    try:
+        url = f"https://m.stock.naver.com/api/stock/{ticker}/basic"
+        headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
 
+        current_price = float(data.get("closePrice", "0").replace(",", ""))
+        change = float(data.get("compareToPreviousClosePrice", "0").replace(",", ""))
+        change_pct = float(data.get("fluctuationsRatio", "0"))
+        name = data.get("stockName", ticker)
+
+        return {
+            "ticker": ticker,
+            "name": name,
+            "price": current_price,
+            "change": change,
+            "change_pct": change_pct,
+            "market": "US",
+        }
+    except Exception as e:
+        print(f"미국 주가 조회 오류 ({ticker}): {e}")
+        return None
+
+
+async def get_stock_price(ticker: str) -> Optional[dict]:
+    """종목 현재가 조회"""
+    # 한국/미국 구분
+    is_kr = any(s["ticker"] == ticker and s["market"] == "KR" for s in ALL_STOCKS) or ticker.isdigit()
+    if is_kr:
+        return await get_kr_price(ticker)
+    else:
+        return await get_us_price(ticker)
+
+
+async def search_stock(query: str, market: str = "ALL") -> list:
+    """종목 검색"""
+    pool = []
     if market in ("ALL", "KR"):
         pool.extend(KR_POPULAR)
     if market in ("ALL", "US"):
         pool.extend(US_POPULAR)
 
     query_lower = query.lower()
-    for item in pool:
-        if query_lower in item["name"].lower() or query_lower in item["ticker"].lower():
-            price_info = get_stock_price(item["ticker"])
-            if price_info:
-                results.append(price_info)
+    matched = [s for s in pool if query_lower in s["name"].lower() or query_lower in s["ticker"].lower()]
 
+    results = []
+    for item in matched[:5]:
+        price_info = await get_stock_price(item["ticker"])
+        if price_info:
+            price_info["name"] = item["name"]
+            results.append(price_info)
     return results
 
 
-def get_popular_stocks(market: str = "ALL") -> list:
+async def get_popular_stocks(market: str = "ALL") -> list:
     """인기 종목 리스트"""
     pool = []
     if market in ("ALL", "KR"):
@@ -90,8 +128,8 @@ def get_popular_stocks(market: str = "ALL") -> list:
 
     results = []
     for item in pool:
-        price_info = get_stock_price(item["ticker"])
+        price_info = await get_stock_price(item["ticker"])
         if price_info:
-            price_info["name"] = item["name"]  # 한글 이름 우선
+            price_info["name"] = item["name"]
             results.append(price_info)
     return results

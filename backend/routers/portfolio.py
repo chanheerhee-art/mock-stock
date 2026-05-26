@@ -34,7 +34,7 @@ async def get_my_portfolio(user: User = Depends(get_current_user), db: AsyncSess
     total_eval = 0.0
 
     for p in portfolios:
-        price_info = get_stock_price(p.ticker)
+        price_info = await get_stock_price(p.ticker)
         if not price_info:
             continue
 

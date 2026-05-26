@@ -23,7 +23,7 @@ async def get_ranking(db: AsyncSession = Depends(get_db)):
 
         total_eval = 0.0
         for p in portfolios:
-            price_info = get_stock_price(p.ticker)
+            price_info = await get_stock_price(p.ticker)
             if price_info:
                 total_eval += price_info["price"] * p.quantity
 
