@@ -599,6 +599,29 @@ export default function TradePage() {
       .finally(() => setPopularLoading(false));
   }, [market]);
 
+  // 선택된 종목 가격 15초 갱신
+  useEffect(() => {
+    if (!selected) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await api.get(`/stock/price/${selected.ticker}`);
+        setSelected(res.data);
+      } catch {}
+    }, 15_000);
+    return () => clearInterval(id);
+  }, [selected?.ticker]);
+
+  // 인기 종목 가격 30초 갱신
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const res = await api.get(`/stock/popular?market=${market}`);
+        setPopular(res.data);
+      } catch {}
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [market]);
+
   // 키보드 닫고 sheet 열기 (모바일 키보드 겹침 방지)
   const openSheet = useCallback((stock: StockInfo) => {
     (document.activeElement as HTMLElement)?.blur();

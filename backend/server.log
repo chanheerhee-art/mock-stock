@@ -750,3 +750,11 @@ INFO:     Finished server process [48635]
 INFO:     Started server process [51134]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51134]
+INFO:     Started server process [52924]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

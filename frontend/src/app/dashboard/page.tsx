@@ -185,6 +185,9 @@ export default function Dashboard() {
     const token = localStorage.getItem("token");
     if (!token) { router.replace("/"); return; }
     fetchData();
+    // 30초마다 포트폴리오 평가금액 갱신
+    const id = setInterval(fetchData, 30_000);
+    return () => clearInterval(id);
   }, [router, fetchData]);
 
   if (loading) return (

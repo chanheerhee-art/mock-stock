@@ -210,6 +210,24 @@ export default function StockDetailPage() {
     } catch {}
   }, [ticker]);
 
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // 가격만 갱신 (15초 폴링용)
+  const fetchPrice = useCallback(async () => {
+    try {
+      const [stockRes, statusRes] = await Promise.all([
+        api.get(`/stock/price/${ticker}`),
+        api.get("/stock/market-status?market=ALL").catch(() => ({ data: null })),
+      ]);
+      setStock(stockRes.data);
+      setLastUpdated(new Date());
+      if (statusRes.data) {
+        const mkt = stockRes.data.market === "KR" ? statusRes.data.KR : statusRes.data.US;
+        setMarketStatus(mkt);
+      }
+    } catch {}
+  }, [ticker]);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.replace("/"); return; }
@@ -225,12 +243,16 @@ export default function StockDetailPage() {
         const mkt = stockRes.data.market === "KR" ? statusRes.data.KR : statusRes.data.US;
         setMarketStatus(mkt);
       }
-    }).finally(() => setLoading(false));
+    }).then(() => setLastUpdated(new Date())).finally(() => setLoading(false));
 
     fetchChart("1mo");
     fetchMyInfo();
     fetchDividend();
-  }, [ticker, router, fetchChart, fetchMyInfo, fetchDividend]);
+
+    // 15초마다 가격 자동 갱신
+    const priceInterval = setInterval(fetchPrice, 15_000);
+    return () => clearInterval(priceInterval);
+  }, [ticker, router, fetchChart, fetchMyInfo, fetchDividend, fetchPrice]);
 
   // 호가창 열 때만 로드 + 10초마다 갱신
   useEffect(() => {
@@ -372,7 +394,14 @@ export default function StockDetailPage() {
               }`} />
             )}
           </div>
-          <div className="text-xs text-gray-500 mb-3">{stock.ticker}</div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-gray-500">{stock.ticker}</span>
+            {lastUpdated && (
+              <span className="text-xs text-gray-600">
+                · {lastUpdated.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} 기준
+              </span>
+            )}
+          </div>
 
           <div className="flex items-end gap-3">
             <div>

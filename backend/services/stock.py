@@ -6,7 +6,7 @@ from typing import Optional
 # ── 인메모리 캐시 ──────────────────────────────────────────
 # { cache_key: (data_dict, expires_at) }
 _price_cache: dict[str, tuple[dict, float]] = {}
-_PRICE_TTL = 90  # 초 (장중 1.5분 캐시)
+_PRICE_TTL = 15  # 초 (15초 캐시 — 거의 실시간)
 # ticker별 개별 락: 같은 ticker 중복 요청만 직렬화, 다른 ticker는 병렬
 _ticker_locks: dict[str, asyncio.Lock] = {}
 
