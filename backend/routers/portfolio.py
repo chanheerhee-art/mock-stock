@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from models.database import get_db, User, Portfolio, AssetSnapshot, ShortPosition, TradeHistory, TradeType, SEED_MONEY
 from services.stock import get_stock_price
