@@ -1675,7 +1675,7 @@ async def search_yahoo(query: str) -> list:
             data = resp.json()
 
         # 미국 거래소 종목만 (한국/독일 등 제외), EQUITY/ETF만
-        valid_exchanges = {"NMS", "NYQ", "NGM", "NCM", "NYSEArca", "NasdaqGS", "NasdaqGM", "NasdaqCM", "NYSE", "NASDAQ"}
+        valid_exchanges = {"NMS", "NYQ", "NGM", "NCM", "NYSEArca", "NasdaqGS", "NasdaqGM", "NasdaqCM", "NYSE", "NASDAQ", "PCX", "BATS", "ARCA"}
         quotes = [
             q for q in data.get("quotes", [])
             if q.get("quoteType") in ("EQUITY", "ETF")
