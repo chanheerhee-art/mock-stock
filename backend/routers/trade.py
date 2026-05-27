@@ -205,8 +205,6 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
 
     market = req.market or "KR"
     status = get_market_status(market)
-    if not status["is_open"]:
-        raise HTTPException(status_code=403, detail=f"장이 열려있지 않습니다. {status['message']}")
 
     price_info = await get_stock_price(req.ticker)
     if not price_info:
@@ -214,7 +212,7 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
 
     market_price_krw, raw_price_usd, usd_krw, session_label = await _resolve_price(req, price_info, status)
 
-    # ── 지정가 주문: 즉시 체결 안 하고 대기열에 등록 ──
+    # ── 지정가 주문: 24시간 접수, 장 열리면 자동 체결 ──
     if req.limit_price is not None:
         if req.limit_price <= 0:
             raise HTTPException(status_code=400, detail="지정가는 0보다 커야 합니다")
@@ -245,17 +243,22 @@ async def buy_stock(req: TradeRequest, user: User = Depends(get_current_user), d
         await db.commit()
         await db.refresh(order)
 
+        market_msg = "" if status["is_open"] else f" (장 마감 중 — 개장 시 자동 체결)"
         return {
-            "message": f"{price_info['name']} {req.quantity}주 매수 지정가 주문 등록 ({limit_price:,.0f}원) — 현재가 {market_price_krw:,.0f}원 이하로 내려오면 자동 체결",
+            "message": f"{price_info['name']} {req.quantity}주 매수 지정가 주문 등록 ({limit_price:,.0f}원){market_msg}",
             "order_id": order.id,
             "limit_price": limit_price,
             "current_price": market_price_krw,
             "reserved_cash": total_cost,
             "remaining_cash": user.cash,
             "order_type": "pending",
+            "market_open": status["is_open"],
         }
 
-    # ── 시장가: 즉시 체결 ──
+    # ── 시장가: 장이 열린 시간에만 ──
+    if not status["is_open"]:
+        raise HTTPException(status_code=403, detail=f"시장가 주문은 장 중에만 가능합니다. 지정가 주문을 이용하거나 {status['open_time']}에 다시 시도하세요.")
+
     return await _execute_buy(
         user, db, req.ticker, req.quantity,
         market_price_krw, price_info, usd_krw, raw_price_usd,
@@ -273,8 +276,6 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
 
     market = req.market or "KR"
     status = get_market_status(market)
-    if not status["is_open"]:
-        raise HTTPException(status_code=403, detail=f"장이 열려있지 않습니다. {status['message']}")
 
     # 보유 수량 먼저 확인
     result = await db.execute(
@@ -331,15 +332,20 @@ async def sell_stock(req: TradeRequest, user: User = Depends(get_current_user), 
         await db.commit()
         await db.refresh(order)
 
+        market_msg = "" if status["is_open"] else f" (장 마감 중 — 개장 시 자동 체결)"
         return {
-            "message": f"{price_info['name']} {req.quantity}주 매도 지정가 주문 등록 ({limit_price:,.0f}원) — 현재가 {market_price_krw:,.0f}원 이상으로 오르면 자동 체결",
+            "message": f"{price_info['name']} {req.quantity}주 매도 지정가 주문 등록 ({limit_price:,.0f}원){market_msg}",
             "order_id": order.id,
             "limit_price": limit_price,
             "current_price": market_price_krw,
             "order_type": "pending",
+            "market_open": status["is_open"],
         }
 
-    # ── 시장가: 즉시 체결 ──
+    # ── 시장가: 장이 열린 시간에만 ──
+    if not status["is_open"]:
+        raise HTTPException(status_code=403, detail=f"시장가 주문은 장 중에만 가능합니다. 지정가 주문을 이용하거나 {status['open_time']}에 다시 시도하세요.")
+
     return await _execute_sell(
         user, db, req.ticker, req.quantity,
         market_price_krw, price_info, usd_krw, raw_price_usd,

@@ -1140,3 +1140,47 @@ INFO:     Finished server process [56601]
 INFO:     Started server process [77741]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+스케줄러 시작됨!
+[OrderEngine] 시작 — 30초마다 미체결 주문 체크
+INFO:     127.0.0.1:62341 - "GET /stock/market-status?market=ALL HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'routers/trade.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [77741]
+INFO:     Started server process [79652]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/trade.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79652]
+INFO:     Started server process [79732]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/trade.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79732]
+INFO:     Started server process [79772]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/trade.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [79772]
+INFO:     Started server process [79842]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

@@ -151,6 +151,8 @@ export default function StockDetailPage() {
   // 거래 패널 상태
   const [showTrade, setShowTrade] = useState(false);
   const [tradeType, setTradeType] = useState<TradeType>("BUY");
+  const [orderMode, setOrderMode] = useState<"market" | "limit">("market"); // 시장가/지정가
+  const [limitPrice, setLimitPrice] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
   const [tradeLoading, setTradeLoading] = useState(false);
   const [myInfo, setMyInfo] = useState<PortfolioInfo | null>(null);
@@ -347,13 +349,21 @@ export default function StockDetailPage() {
     setTradeLoading(true);
     try {
       const endpoint = tradeType === "BUY" ? "/trade/buy" : "/trade/sell";
-      const res = await api.post(endpoint, { ticker: stock.ticker, quantity, market: stock.market });
+      const body: Record<string, unknown> = { ticker: stock.ticker, quantity, market: stock.market };
+      if (orderMode === "limit") {
+        const lp = parseFloat(limitPrice.replace(/,/g, ""));
+        if (!lp || lp <= 0) { showToast("지정가를 입력해주세요", "error"); setTradeLoading(false); return; }
+        body.limit_price = lp;
+      }
+      const res = await api.post(endpoint, body);
       const portfolioRes = await api.get("/portfolio/me");
       setMyInfo(portfolioRes.data);
       setQuantity(1);
+      setLimitPrice("");
       showToast(res.data.message, "success");
-    } catch (e: any) {
-      showToast(e.response?.data?.detail || "거래 실패", "error");
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      showToast(err.response?.data?.detail || "거래 실패", "error");
     } finally { setTradeLoading(false); }
   };
 
@@ -999,7 +1009,7 @@ export default function StockDetailPage() {
 
         {/* 거래 버튼 */}
         <button
-          onClick={() => { (document.activeElement as HTMLElement)?.blur(); setTimeout(() => { setShowTrade(true); setQuantity(1); }, 80); }}
+          onClick={() => { (document.activeElement as HTMLElement)?.blur(); setTimeout(() => { setShowTrade(true); setQuantity(1); setLimitPrice(priceKrw ? Math.round(priceKrw).toString() : ""); setOrderMode(isTradeAllowed ? "market" : "limit"); }, 80); }}
           className="w-full bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-bold py-4 rounded-2xl text-sm active:scale-95 transition-all"
         >
           💹 {stock.name} 거래하기
@@ -1064,10 +1074,11 @@ export default function StockDetailPage() {
                 </div>
               </div>
 
+              {/* 장 상태 안내 */}
               {marketStatus && !marketStatus.is_open && (
-                <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 text-xs text-gray-400 text-center">
-                  {marketStatus.message}
-                  <span className="text-gray-500 ml-1">개장: {marketStatus.open_time} ~ {marketStatus.close_time}</span>
+                <div className="rounded-xl px-4 py-2.5 text-xs text-center" style={{ background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)" }}>
+                  <span className="text-yellow-400 font-semibold">🕐 장 마감 중</span>
+                  <span className="text-gray-500 ml-1">— 지정가 주문은 24시간 접수 가능, 개장 시 자동 체결</span>
                 </div>
               )}
 
@@ -1083,11 +1094,68 @@ export default function StockDetailPage() {
                 </button>
               </div>
 
+              {/* 시장가/지정가 탭 */}
+              <div className="flex rounded-xl overflow-hidden border border-gray-700">
+                <button
+                  onClick={() => setOrderMode("market")}
+                  disabled={!isTradeAllowed}
+                  className={`flex-1 py-2 text-xs font-semibold transition-all ${
+                    orderMode === "market"
+                      ? "bg-gray-600 text-white"
+                      : "bg-gray-800 text-gray-500"
+                  } disabled:opacity-40`}
+                >
+                  시장가
+                  {!isTradeAllowed && <span className="ml-1 text-gray-600">(마감)</span>}
+                </button>
+                <button
+                  onClick={() => { setOrderMode("limit"); if (!limitPrice) setLimitPrice(Math.round(priceKrw).toString()); }}
+                  className={`flex-1 py-2 text-xs font-semibold transition-all ${
+                    orderMode === "limit"
+                      ? "bg-gray-600 text-white"
+                      : "bg-gray-800 text-gray-500"
+                  }`}
+                >
+                  지정가
+                  <span className="ml-1 text-green-400 text-xs">24시간</span>
+                </button>
+              </div>
+
+              {/* 지정가 입력 */}
+              {orderMode === "limit" && (
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">지정가 (원화)</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={limitPrice}
+                      onChange={(e) => setLimitPrice(e.target.value)}
+                      placeholder={Math.round(priceKrw).toString()}
+                      className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 font-bold outline-none text-center"
+                    />
+                    <span className="text-gray-500 text-sm shrink-0">원</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[-3, -1, +1, +3].map(pct => {
+                      const adj = Math.round(priceKrw * (1 + pct / 100));
+                      return (
+                        <button key={pct} onClick={() => setLimitPrice(adj.toString())}
+                          className={`flex-1 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                            pct < 0 ? "bg-blue-500/20 text-blue-400" : "bg-red-500/20 text-red-400"
+                          }`}>
+                          {pct > 0 ? "+" : ""}{pct}%
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* 빠른 수량 */}
               <div className="flex gap-2">
                 {[{ label: "1/3", type: "third" as const }, { label: "1/2", type: "half" as const }, { label: "전량", type: "all" as const }].map((btn) => (
-                  <button key={btn.type} onClick={() => handleQuickQty(btn.type)} disabled={!isTradeAllowed}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors disabled:opacity-40">
+                  <button key={btn.type} onClick={() => handleQuickQty(btn.type)}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors">
                     {btn.label}
                   </button>
                 ))}
@@ -1095,14 +1163,13 @@ export default function StockDetailPage() {
 
               {/* 수량 */}
               <div className="flex items-center gap-3">
-                <button onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={!isTradeAllowed}
-                  className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">−</button>
+                <button onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors">−</button>
                 <input type="number" min={1} value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  disabled={!isTradeAllowed}
-                  className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 text-center font-bold outline-none text-lg disabled:opacity-40" />
-                <button onClick={() => setQuantity(quantity + 1)} disabled={!isTradeAllowed}
-                  className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors disabled:opacity-40">+</button>
+                  className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2.5 text-center font-bold outline-none text-lg" />
+                <button onClick={() => setQuantity(quantity + 1)}
+                  className="bg-gray-700 hover:bg-gray-600 text-white w-11 h-11 rounded-xl font-bold text-xl transition-colors">+</button>
               </div>
 
               {/* 금액 요약 */}
@@ -1110,10 +1177,12 @@ export default function StockDetailPage() {
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">예상 금액</span>
                   <span className="text-white font-bold">
-                    {isUS ? `$${((sessionPriceUsd ?? stock.price) * quantity).toFixed(2)}` : `${(stock.price * quantity).toLocaleString()}원`}
+                    {orderMode === "limit" && limitPrice
+                      ? `${(parseFloat(limitPrice.replace(/,/g, "")) * quantity).toLocaleString()}원`
+                      : isUS ? `$${((sessionPriceUsd ?? stock.price) * quantity).toFixed(2)}` : `${(stock.price * quantity).toLocaleString()}원`}
                   </span>
                 </div>
-                {isUS && usdKrw && (
+                {isUS && usdKrw && orderMode === "market" && (
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 text-xs">{sessionLabel} 원화 환산</span>
                     <span className="text-gray-300 text-sm font-semibold">≈ {((sessionPriceUsd ?? stock.price) * usdKrw * quantity).toLocaleString()}원</span>
@@ -1128,18 +1197,20 @@ export default function StockDetailPage() {
               </div>
 
               {/* 거래 버튼 */}
-              <button onClick={handleTrade} disabled={tradeLoading || !isTradeAllowed}
+              <button onClick={handleTrade} disabled={tradeLoading || (orderMode === "market" && !isTradeAllowed)}
                 className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
-                  !isTradeAllowed ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                  orderMode === "market" && !isTradeAllowed ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                   : tradeType === "BUY" ? "bg-red-500 hover:bg-red-400 text-white"
                   : "bg-blue-500 hover:bg-blue-400 text-white"
                 } disabled:opacity-60`}>
                 {tradeLoading
                   ? "처리 중..."
+                  : orderMode === "limit"
+                  ? `${tradeType === "BUY" ? "매수" : "매도"} 지정가 주문 ${!isTradeAllowed ? "(개장 시 체결)" : ""}`
                   : !isTradeAllowed
-                  ? "장 마감 (거래 불가)"
+                  ? "장 마감 — 지정가로 주문하세요"
                   : session !== "regular"
-                  ? `${tradeType === "BUY" ? "매수" : "매도"} 확인 (${session === "pre" ? (isUS ? "프리마켓" : "장전 시간외") : (isUS ? "애프터마켓" : "시간외")})`
+                  ? `${tradeType === "BUY" ? "매수" : "매도"} 확인 (${session === "pre" ? (isUS ? "프리마켓" : "장전") : (isUS ? "애프터" : "시간외")})`
                   : `${tradeType === "BUY" ? "매수" : "매도"} 확인`}
               </button>
             </div>
