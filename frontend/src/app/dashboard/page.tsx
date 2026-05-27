@@ -388,8 +388,8 @@ export default function Dashboard() {
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">
                       {h.quantity}주 · 평단{" "}
-                      {h.is_us && h.usd_krw
-                        ? `$${(h.avg_price / h.usd_krw).toFixed(2)}`
+                      {h.is_us && portfolio.usd_krw
+                        ? `$${(h.avg_price / portfolio.usd_krw).toFixed(2)}`
                         : `${h.avg_price.toLocaleString()}원`}
                     </div>
                   </div>
