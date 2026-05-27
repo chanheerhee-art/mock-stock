@@ -27,10 +27,18 @@ def get_market_status(market: str) -> dict:
 
 
 def _kr_status(now_kst: datetime, is_weekday: bool) -> dict:
-    """한국 주식: 평일 09:00~15:30 KST (프리/애프터 없음)"""
-    OPEN = time(9, 0)
-    CLOSE = time(15, 30)
-    PRE = time(8, 0)
+    """
+    한국 주식 세션:
+      장전 시간외:     08:00 ~ 09:00 KST
+      정규장:          09:00 ~ 15:30 KST
+      시간외 단일가:   15:40 ~ 16:00 KST
+      장후 시간외:     16:00 ~ 18:00 KST
+    """
+    PRE_OPEN    = time(8, 0)
+    OPEN        = time(9, 0)
+    CLOSE       = time(15, 30)
+    EXT_START   = time(15, 40)   # 시간외 단일가 시작
+    AFTER_CLOSE = time(18, 0)    # 장후 시간외 종료
 
     t = now_kst.time()
 
@@ -38,30 +46,43 @@ def _kr_status(now_kst: datetime, is_weekday: bool) -> dict:
         return {
             "is_open": False, "status": "closed", "session": "closed",
             "message": "🇰🇷 한국 주식시장 휴장 (주말)",
-            "open_time": "월요일 09:00", "close_time": "15:30",
+            "open_time": "월요일 08:00", "close_time": "18:00",
         }
 
     if OPEN <= t < CLOSE:
+        # 정규장
         close_dt = now_kst.replace(hour=15, minute=30, second=0, microsecond=0)
         remaining = int((close_dt - now_kst).total_seconds() / 60)
         return {
             "is_open": True, "status": "open", "session": "regular",
-            "message": f"🇰🇷 한국 주식시장 거래 중 · {remaining}분 후 마감",
+            "message": f"🇰🇷 정규장 거래 중 · {remaining}분 후 마감",
             "open_time": "09:00", "close_time": "15:30",
         }
-    elif PRE <= t < OPEN:
+    elif PRE_OPEN <= t < OPEN:
+        # 장전 시간외
         open_dt = now_kst.replace(hour=9, minute=0, second=0, microsecond=0)
         remaining = int((open_dt - now_kst).total_seconds() / 60)
         return {
-            "is_open": False, "status": "pre", "session": "closed",
-            "message": f"🇰🇷 장전 · {remaining}분 후 개장 (09:00)",
-            "open_time": "09:00", "close_time": "15:30",
+            "is_open": True, "status": "pre", "session": "pre",
+            "message": f"🇰🇷 장전 시간외 거래 중 · {remaining}분 후 정규장 개장",
+            "open_time": "08:00", "close_time": "18:00",
+        }
+    elif EXT_START <= t < AFTER_CLOSE:
+        # 시간외 단일가 / 장후 시간외
+        after_dt = now_kst.replace(hour=18, minute=0, second=0, microsecond=0)
+        remaining = int((after_dt - now_kst).total_seconds() / 60)
+        session_name = "시간외 단일가" if t < time(16, 0) else "장후 시간외"
+        return {
+            "is_open": True, "status": "after", "session": "after",
+            "message": f"🇰🇷 {session_name} 거래 중 · {remaining}분 후 마감",
+            "open_time": "08:00", "close_time": "18:00",
         }
     else:
+        # 완전 장외 (18:00 ~ 다음날 08:00)
         return {
-            "is_open": False, "status": "after", "session": "closed",
-            "message": "🇰🇷 한국 주식시장 마감 (내일 09:00 개장)",
-            "open_time": "09:00", "close_time": "15:30",
+            "is_open": False, "status": "closed", "session": "closed",
+            "message": "🇰🇷 한국 주식시장 마감 (내일 08:00 장전 시간외)",
+            "open_time": "08:00", "close_time": "18:00",
         }
 
 

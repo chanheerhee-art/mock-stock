@@ -464,11 +464,13 @@ export default function StockDetailPage() {
                 <div className="text-3xl font-bold text-white">
                   {isUS ? `$${stock.price.toFixed(2)}` : `${stock.price.toLocaleString()}원`}
                 </div>
-                {isUS && session !== "regular" && (
+                {session !== "regular" && session !== "closed" && (
                   <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold ${
                     session === "pre" ? "bg-yellow-500/20 text-yellow-400" : "bg-purple-500/20 text-purple-400"
                   }`}>
-                    {session === "pre" ? "🌅 프리" : "🌙 애프터"}
+                    {session === "pre"
+                      ? (isUS ? "🌅 프리마켓" : "🌅 장전 시간외")
+                      : (isUS ? "🌙 애프터마켓" : "🌙 시간외")}
                   </span>
                 )}
               </div>
@@ -1050,8 +1052,10 @@ export default function StockDetailPage() {
                       : marketStatus.is_open ? "bg-green-500/20 text-green-400"
                       : "bg-gray-700 text-gray-400"
                     }`}>
-                      {session === "pre" ? "● 프리마켓"
-                        : session === "after" ? "● 애프터마켓"
+                      {session === "pre"
+                        ? (isUS ? "● 프리마켓" : "● 장전 시간외")
+                        : session === "after"
+                        ? (isUS ? "● 애프터마켓" : "● 시간외")
                         : marketStatus.is_open ? "● 거래 가능"
                         : "● 마감"}
                     </div>
@@ -1130,7 +1134,13 @@ export default function StockDetailPage() {
                   : tradeType === "BUY" ? "bg-red-500 hover:bg-red-400 text-white"
                   : "bg-blue-500 hover:bg-blue-400 text-white"
                 } disabled:opacity-60`}>
-                {tradeLoading ? "처리 중..." : !isTradeAllowed ? "장 마감 (거래 불가)" : `${tradeType === "BUY" ? "매수" : "매도"} 확인`}
+                {tradeLoading
+                  ? "처리 중..."
+                  : !isTradeAllowed
+                  ? "장 마감 (거래 불가)"
+                  : session !== "regular"
+                  ? `${tradeType === "BUY" ? "매수" : "매도"} 확인 (${session === "pre" ? (isUS ? "프리마켓" : "장전 시간외") : (isUS ? "애프터마켓" : "시간외")})`
+                  : `${tradeType === "BUY" ? "매수" : "매도"} 확인`}
               </button>
             </div>
           </div>
