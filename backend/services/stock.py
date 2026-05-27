@@ -31,6 +31,37 @@ def _cache_set(key: str, data: dict):
 POPULAR_KR = ["005930", "000660", "035420", "035720", "005380", "373220", "068270", "247540"]
 POPULAR_US = ["AAPL", "NVDA", "TSLA", "MSFT", "GOOGL", "META", "AMZN", "PLTR"]
 
+# 인기 ETF (국내 + 미국)
+POPULAR_ETF_KR = [
+    "069500",  # KODEX 200
+    "229200",  # KODEX 코스닥150
+    "133690",  # KODEX 미국나스닥100
+    "360750",  # TIGER 미국S&P500
+    "381170",  # TIGER 미국테크TOP10
+    "114800",  # KODEX 인버스
+    "122630",  # KODEX 레버리지
+    "251340",  # KODEX 코스닥150 선물인버스
+]
+POPULAR_ETF_US = ["SPY", "QQQ", "VOO", "VTI", "IVV", "DIA", "IWM", "ARKK"]
+
+# ETF 한글 이름
+ETF_NAME_KO: dict[str, str] = {
+    "069500": "KODEX 200",
+    "229200": "KODEX 코스닥150",
+    "133690": "KODEX 미국나스닥100",
+    "360750": "TIGER 미국S&P500",
+    "381170": "TIGER 미국테크TOP10",
+    "114800": "KODEX 인버스",
+    "122630": "KODEX 레버리지",
+    "251340": "KODEX 코스닥150 선물인버스",
+    "102110": "TIGER 200",
+    "278530": "KODEX 200TR",
+    "305720": "KODEX 2차전지산업",
+    "091160": "KODEX 반도체",
+    "091180": "KODEX 자동차",
+    "117460": "KODEX 에너지화학",
+}
+
 # 미국 주식 한글 이름 매핑 (~300개)
 US_NAME_KO: dict[str, str] = {
     # ── 빅테크 ──
@@ -1714,3 +1745,28 @@ async def get_popular_stocks(market: str = "ALL") -> list:
 
     results = await asyncio.gather(*tasks)
     return [r for r in results if r is not None]
+
+
+async def get_popular_etfs(market: str = "ALL") -> list:
+    """홈화면 인기 ETF"""
+    import asyncio
+
+    tasks = []
+    if market in ("ALL", "KR"):
+        for ticker in POPULAR_ETF_KR:
+            tasks.append(get_naver_price(ticker))
+    if market in ("ALL", "US"):
+        for ticker in POPULAR_ETF_US:
+            tasks.append(get_yahoo_price(ticker))
+
+    results = await asyncio.gather(*tasks)
+    # ETF 이름 보정 + exchange를 ETF로 통일
+    enriched = []
+    for r in results:
+        if not r:
+            continue
+        if r["market"] == "KR" and r["ticker"] in ETF_NAME_KO:
+            r["name"] = ETF_NAME_KO[r["ticker"]]
+        r["exchange"] = "ETF"
+        enriched.append(r)
+    return enriched

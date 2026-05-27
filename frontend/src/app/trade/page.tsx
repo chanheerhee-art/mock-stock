@@ -63,7 +63,7 @@ interface PendingOrder {
   created_at: string;
 }
 
-type MainTab = "TRADE" | "SHORT";
+type MainTab = "TRADE" | "SHORT" | "FUTURES";
 type TradeType = "BUY" | "SELL";
 type OrderType = "MARKET" | "LIMIT";
 
@@ -528,6 +528,36 @@ export default function TradePage() {
   const [shortStocks, setShortStocks] = useState<StockInfo[]>([]);
   const [shortQuery, setShortQuery] = useState("");
 
+  // 자동완성 / 최근 검색어
+  const [suggestions, setSuggestions] = useState<StockInfo[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 카테고리 (주식/ETF)
+  const [category, setCategory] = useState<"STOCK" | "ETF">("STOCK");
+  const [etfs, setEtfs] = useState<StockInfo[]>([]);
+  const [etfLoading, setEtfLoading] = useState(false);
+
+  // 선물
+  interface FuturesIndex {
+    price: number; change: number; change_pct: number; prev_close: number;
+    day_high: number; day_low: number;
+    multiplier: number; margin_rate: number;
+    contract_value: number; required_margin_per_contract: number;
+  }
+  interface FuturesPos {
+    id: number; side: "LONG" | "SHORT"; contracts: number;
+    entry_price: number; current_price: number; margin: number;
+    profit: number; profit_pct: number; opened_at: string;
+  }
+  const [futuresIndex, setFuturesIndex] = useState<FuturesIndex | null>(null);
+  const [futuresPositions, setFuturesPositions] = useState<FuturesPos[]>([]);
+  const [futuresSide, setFuturesSide] = useState<"LONG" | "SHORT">("LONG");
+  const [futuresContracts, setFuturesContracts] = useState(1);
+  const [futuresLoading, setFuturesLoading] = useState(false);
+
   // 미체결 주문
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
@@ -566,6 +596,41 @@ export default function TradePage() {
     try { const res = await api.get("/trade/orders"); setPendingOrders(res.data); } catch {}
   }, []);
 
+  const fetchFuturesIndex = useCallback(async () => {
+    try { const res = await api.get("/futures/index"); setFuturesIndex(res.data); } catch {}
+  }, []);
+
+  const fetchFuturesPositions = useCallback(async () => {
+    try { const res = await api.get("/futures/positions"); setFuturesPositions(res.data); } catch {}
+  }, []);
+
+  const handleFuturesOpen = async () => {
+    if (!futuresIndex) return;
+    setFuturesLoading(true);
+    try {
+      const res = await api.post("/futures/open", { side: futuresSide, contracts: futuresContracts });
+      showToast(`${futuresSide === "LONG" ? "롱" : "숏"} ${res.data.contracts}계약 진입`, "success");
+      fetchFuturesPositions(); fetchMyInfo();
+    } catch (e: any) {
+      showToast(e.response?.data?.detail || "진입 실패", "error");
+    } finally { setFuturesLoading(false); }
+  };
+
+  const handleFuturesClose = async (posId: number) => {
+    setFuturesLoading(true);
+    try {
+      const res = await api.post(`/futures/close/${posId}`);
+      const profit = res.data.profit;
+      showToast(
+        `청산 완료 (${profit >= 0 ? "+" : ""}${profit.toLocaleString()}원, ${res.data.profit_pct.toFixed(2)}%)`,
+        profit >= 0 ? "success" : "error"
+      );
+      fetchFuturesPositions(); fetchMyInfo();
+    } catch (e: any) {
+      showToast(e.response?.data?.detail || "청산 실패", "error");
+    } finally { setFuturesLoading(false); }
+  };
+
   const handleCancelOrder = async (orderId: number) => {
     setCancellingId(orderId);
     try {
@@ -598,6 +663,23 @@ export default function TradePage() {
       .then((res) => setPopular(res.data))
       .finally(() => setPopularLoading(false));
   }, [market]);
+
+  useEffect(() => {
+    if (category !== "ETF") return;
+    setEtfLoading(true);
+    api.get(`/stock/popular-etfs?market=${market}`)
+      .then((res) => setEtfs(res.data))
+      .finally(() => setEtfLoading(false));
+  }, [category, market]);
+
+  // 선물 탭 진입 시 데이터 로드 + 30초 갱신
+  useEffect(() => {
+    if (mainTab !== "FUTURES") return;
+    fetchFuturesIndex();
+    fetchFuturesPositions();
+    const id = setInterval(() => { fetchFuturesIndex(); fetchFuturesPositions(); }, 30_000);
+    return () => clearInterval(id);
+  }, [mainTab, fetchFuturesIndex, fetchFuturesPositions]);
 
   // 선택된 종목 가격 15초 갱신
   useEffect(() => {
@@ -634,11 +716,64 @@ export default function TradePage() {
     setTimeout(() => setShortSelected(stock), 100);
   }, []);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  // 최근 검색어 로드
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("recentSearches");
+      if (saved) setRecentSearches(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  const saveRecentSearch = useCallback((term: string) => {
+    if (!term.trim()) return;
+    setRecentSearches((prev) => {
+      const next = [term, ...prev.filter((t) => t !== term)].slice(0, 5);
+      localStorage.setItem("recentSearches", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const removeRecentSearch = useCallback((term: string) => {
+    setRecentSearches((prev) => {
+      const next = prev.filter((t) => t !== term);
+      localStorage.setItem("recentSearches", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // 자동완성 debounce
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!query.trim()) {
+      setSuggestions([]);
+      setSuggestLoading(false);
+      return;
+    }
+    setSuggestLoading(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get(`/stock/search?q=${encodeURIComponent(query)}&market=${market}`);
+        setSuggestions(res.data.slice(0, 8));
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSuggestLoading(false);
+      }
+    }, 250);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [query, market]);
+
+  const handleSearch = async (overrideQuery?: string) => {
+    const q = (overrideQuery ?? query).trim();
+    if (!q) return;
+    setQuery(q);
+    setShowSuggest(false);
     (document.activeElement as HTMLElement)?.blur();
-    const res = await api.get(`/stock/search?q=${encodeURIComponent(query)}&market=${market}`);
+    const res = await api.get(`/stock/search?q=${encodeURIComponent(q)}&market=${market}`);
     setStocks(res.data);
+    saveRecentSearch(q);
   };
 
   const handleShortSearch = async () => {
@@ -663,7 +798,9 @@ export default function TradePage() {
     } finally { setShortLoading(false); }
   };
 
-  const displayList = query && stocks.length > 0 ? stocks : popular;
+  const displayList = query && stocks.length > 0
+    ? stocks
+    : (category === "ETF" ? etfs : popular);
   const shortDisplayList = shortQuery && shortStocks.length > 0 ? shortStocks : popular;
 
   return (
@@ -692,14 +829,18 @@ export default function TradePage() {
         )}
 
         {/* 메인 탭 */}
-        <div className="flex gap-2 bg-gray-800 p-1 rounded-2xl">
+        <div className="flex gap-1.5 bg-gray-800 p-1 rounded-2xl">
           <button onClick={() => setMainTab("TRADE")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${mainTab === "TRADE" ? "bg-yellow-400 text-gray-900" : "text-gray-400"}`}>
-            📈 일반 거래
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${mainTab === "TRADE" ? "bg-yellow-400 text-gray-900" : "text-gray-400"}`}>
+            📈 일반
           </button>
           <button onClick={() => setMainTab("SHORT")}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${mainTab === "SHORT" ? "bg-orange-500 text-white" : "text-gray-400"}`}>
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${mainTab === "SHORT" ? "bg-orange-500 text-white" : "text-gray-400"}`}>
             📉 공매도
+          </button>
+          <button onClick={() => setMainTab("FUTURES")}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${mainTab === "FUTURES" ? "bg-purple-500 text-white" : "text-gray-400"}`}>
+            ⚡ 선물
           </button>
         </div>
 
@@ -717,15 +858,73 @@ export default function TradePage() {
               ))}
             </div>
 
-            <div className="flex gap-2">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                placeholder="종목명, 티커 검색..."
-                className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 text-sm outline-none placeholder-gray-500 border border-gray-700 focus:border-yellow-400 transition-colors"
-              />
-              <button onClick={handleSearch} className="bg-yellow-400 text-gray-900 px-5 rounded-xl font-bold text-sm hover:bg-yellow-300 transition-colors">검색</button>
+            <div className="relative">
+              <div className="flex gap-2">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => setShowSuggest(true)}
+                  onBlur={() => setTimeout(() => setShowSuggest(false), 200)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  placeholder="종목명, 티커 검색..."
+                  className="flex-1 bg-gray-800 text-white rounded-xl px-4 py-3 text-sm outline-none placeholder-gray-500 border border-gray-700 focus:border-yellow-400 transition-colors"
+                />
+                <button onClick={() => handleSearch()} className="bg-yellow-400 text-gray-900 px-5 rounded-xl font-bold text-sm hover:bg-yellow-300 transition-colors">검색</button>
+              </div>
+
+              {/* 자동완성 드롭다운 */}
+              {showSuggest && (query.trim() || recentSearches.length > 0) && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-30 max-h-80 overflow-y-auto">
+                  {query.trim() ? (
+                    suggestLoading ? (
+                      <div className="px-4 py-3 text-xs text-gray-500">검색 중...</div>
+                    ) : suggestions.length === 0 ? (
+                      <div className="px-4 py-3 text-xs text-gray-500">검색 결과 없음</div>
+                    ) : (
+                      suggestions.map((s) => (
+                        <button
+                          key={s.ticker}
+                          onMouseDown={(e) => { e.preventDefault(); handleSearch(s.name); openSheet(s); }}
+                          className="w-full flex justify-between items-center px-4 py-2.5 hover:bg-gray-700 border-b border-gray-700/50 last:border-b-0 text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-white font-medium">{s.name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${EXCHANGE_BADGE[s.exchange] ?? "bg-gray-600 text-gray-300"}`}>
+                              {s.exchange}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-white">{s.market === "US" ? `$${s.price.toFixed(2)}` : `${s.price.toLocaleString()}원`}</div>
+                            <div className={`text-[10px] ${s.change_pct >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                              {s.change_pct >= 0 ? "▲" : "▼"} {Math.abs(s.change_pct).toFixed(2)}%
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )
+                  ) : (
+                    <>
+                      <div className="px-4 py-2 text-[11px] text-gray-500 font-medium border-b border-gray-700/50">🕒 최근 검색어</div>
+                      {recentSearches.map((term) => (
+                        <div key={term} className="flex items-center justify-between px-4 py-2 hover:bg-gray-700 border-b border-gray-700/50 last:border-b-0">
+                          <button
+                            onMouseDown={(e) => { e.preventDefault(); handleSearch(term); }}
+                            className="flex-1 text-left text-sm text-gray-300"
+                          >
+                            {term}
+                          </button>
+                          <button
+                            onMouseDown={(e) => { e.preventDefault(); removeRecentSearch(term); }}
+                            className="text-gray-600 hover:text-gray-400 text-xs px-2"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* 미체결 주문 목록 */}
@@ -763,11 +962,25 @@ export default function TradePage() {
               </div>
             )}
 
+            {/* 카테고리 토글 */}
+            <div className="flex gap-2 bg-gray-800 p-1 rounded-2xl">
+              <button onClick={() => setCategory("STOCK")}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${category === "STOCK" ? "bg-yellow-400 text-gray-900" : "text-gray-400"}`}>
+                🔥 주식
+              </button>
+              <button onClick={() => setCategory("ETF")}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${category === "ETF" ? "bg-yellow-400 text-gray-900" : "text-gray-400"}`}>
+                📦 ETF
+              </button>
+            </div>
+
             <div>
               <p className="text-xs text-gray-500 mb-2 font-medium">
-                {query && stocks.length > 0 ? "🔍 검색 결과" : "🔥 인기 종목"}
+                {query && stocks.length > 0
+                  ? "🔍 검색 결과"
+                  : category === "ETF" ? "📦 인기 ETF" : "🔥 인기 종목"}
               </p>
-              {popularLoading ? (
+              {(category === "ETF" ? etfLoading : popularLoading) ? (
                 <div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="bg-gray-800 rounded-2xl p-4 animate-pulse h-16" />)}</div>
               ) : displayList.length === 0 ? (
                 <div className="bg-gray-800 rounded-2xl p-6 text-center text-gray-500 text-sm">검색 결과가 없어요</div>
@@ -890,6 +1103,138 @@ export default function TradePage() {
                   );
                 })}
               </div>
+            </div>
+          </>
+        )}
+
+        {/* ── 선물 탭 (코스피200) ── */}
+        {mainTab === "FUTURES" && (
+          <>
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 text-xs text-purple-200 space-y-1">
+              <div className="font-bold text-purple-300 mb-1">⚡ 코스피200 선물</div>
+              <div>지수 1포인트당 <span className="text-purple-300 font-semibold">50,000원</span> × 계약수</div>
+              <div>증거금 10% (10배 레버리지) · <span className="text-red-400 font-semibold">롱 매수 / 숏 매도</span></div>
+              <div className="text-purple-300 font-semibold">⚠️ 손실은 증거금 한도까지 (강제 청산)</div>
+            </div>
+
+            {futuresIndex && (
+              <div className="bg-gray-800 rounded-2xl p-4 border border-purple-500/20">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-xs text-gray-500">KOSPI200 지수</div>
+                    <div className="text-2xl font-bold text-white mt-0.5">{futuresIndex.price.toFixed(2)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-sm font-bold ${futuresIndex.change_pct >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                      {futuresIndex.change_pct >= 0 ? "▲" : "▼"} {Math.abs(futuresIndex.change_pct).toFixed(2)}%
+                    </div>
+                    <div className={`text-xs ${futuresIndex.change >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                      {futuresIndex.change >= 0 ? "+" : ""}{futuresIndex.change.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3 text-[11px] text-gray-400 pt-2 border-t border-gray-700/50">
+                  <div className="flex justify-between"><span>고가</span><span className="text-red-400">{futuresIndex.day_high.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span>저가</span><span className="text-blue-400">{futuresIndex.day_low.toFixed(2)}</span></div>
+                  <div className="flex justify-between col-span-2"><span>1계약 명목가치</span><span className="text-gray-300">{futuresIndex.contract_value.toLocaleString()}원</span></div>
+                  <div className="flex justify-between col-span-2"><span>1계약 증거금</span><span className="text-yellow-400 font-semibold">{futuresIndex.required_margin_per_contract.toLocaleString()}원</span></div>
+                </div>
+              </div>
+            )}
+
+            {/* 오픈 포지션 */}
+            {futuresPositions.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 mb-2 font-medium">📋 오픈 포지션</p>
+                <div className="space-y-2">
+                  {futuresPositions.map((p) => (
+                    <div key={p.id} className="bg-gray-800 border border-purple-500/20 rounded-2xl p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${
+                              p.side === "LONG" ? "bg-red-500/20 text-red-400" : "bg-blue-500/20 text-blue-400"
+                            }`}>{p.side === "LONG" ? "롱 LONG" : "숏 SHORT"}</span>
+                            <span className="text-sm font-bold text-white">{p.contracts}계약</span>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">진입 {p.entry_price.toFixed(2)} → 현재 {p.current_price.toFixed(2)}</div>
+                          <div className="text-[11px] text-gray-500 mt-0.5">증거금 {p.margin.toLocaleString()}원</div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-base font-bold ${p.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                            {p.profit >= 0 ? "+" : ""}{p.profit.toLocaleString()}원
+                          </div>
+                          <div className={`text-xs font-semibold ${p.profit_pct >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                            {p.profit_pct >= 0 ? "+" : ""}{p.profit_pct.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={() => handleFuturesClose(p.id)} disabled={futuresLoading}
+                        className="w-full bg-purple-500 hover:bg-purple-400 text-white py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50">
+                        청산하기
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 신규 진입 폼 */}
+            <div className="bg-gray-800 rounded-2xl p-4 space-y-3 border border-gray-700">
+              <div className="text-sm font-bold text-white">신규 진입</div>
+
+              <div className="flex gap-2">
+                <button onClick={() => setFuturesSide("LONG")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${futuresSide === "LONG" ? "bg-red-500 text-white" : "bg-gray-700 text-gray-400"}`}>
+                  🔴 롱 (상승 예상)
+                </button>
+                <button onClick={() => setFuturesSide("SHORT")}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${futuresSide === "SHORT" ? "bg-blue-500 text-white" : "bg-gray-700 text-gray-400"}`}>
+                  🔵 숏 (하락 예상)
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-gray-400">계약 수</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setFuturesContracts(c => Math.max(1, c - 1))}
+                    className="w-9 h-9 bg-gray-700 rounded-lg text-white font-bold">−</button>
+                  <input type="number" min={1} value={futuresContracts}
+                    onChange={(e) => setFuturesContracts(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-16 text-center bg-gray-700 rounded-lg py-1.5 text-white font-bold outline-none"
+                  />
+                  <button onClick={() => setFuturesContracts(c => c + 1)}
+                    className="w-9 h-9 bg-gray-700 rounded-lg text-white font-bold">+</button>
+                </div>
+              </div>
+
+              {futuresIndex && (
+                <div className="bg-gray-900 rounded-xl p-3 space-y-1 text-xs">
+                  <div className="flex justify-between text-gray-400">
+                    <span>필요 증거금</span>
+                    <span className="text-yellow-400 font-semibold">
+                      {(futuresIndex.required_margin_per_contract * futuresContracts).toLocaleString()}원
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-400">
+                    <span>명목가치</span>
+                    <span className="text-gray-300">{(futuresIndex.contract_value * futuresContracts).toLocaleString()}원</span>
+                  </div>
+                  {myInfo && (
+                    <div className="flex justify-between text-gray-400">
+                      <span>보유 현금</span>
+                      <span className="text-gray-300">{myInfo.cash.toLocaleString()}원</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button onClick={handleFuturesOpen} disabled={futuresLoading || !futuresIndex}
+                className={`w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${
+                  futuresSide === "LONG" ? "bg-red-500 hover:bg-red-400 text-white" : "bg-blue-500 hover:bg-blue-400 text-white"
+                }`}>
+                {futuresLoading ? "처리 중..." : `${futuresSide === "LONG" ? "🔴 롱" : "🔵 숏"} ${futuresContracts}계약 진입`}
+              </button>
             </div>
           </>
         )}

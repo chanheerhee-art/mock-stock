@@ -171,6 +171,18 @@ export default function StockDetailPage() {
   const [showNews, setShowNews] = useState(false);
   const [newsLoading, setNewsLoading] = useState(false);
 
+  // 종목 상세 지표
+  interface StockDetails {
+    volume: number | null; avg_volume: number | null;
+    market_cap: number | null;
+    week52_high: number | null; week52_low: number | null;
+    day_high: number | null; day_low: number | null;
+    open: number | null; prev_close: number | null;
+    per: number | null; eps: number | null;
+    dividend_yield: number | null;
+  }
+  const [details, setDetails] = useState<StockDetails | null>(null);
+
   const isUS = stock?.market === "US";
   const isTradeAllowed = marketStatus?.is_open ?? false;
   const heldQty = myInfo?.holdings.find(h => h.ticker === ticker)?.quantity ?? 0;
@@ -225,6 +237,13 @@ export default function StockDetailPage() {
     setNewsLoading(false);
   }, [ticker]);
 
+  const fetchDetails = useCallback(async () => {
+    try {
+      const res = await api.get(`/stock/details/${ticker}`);
+      setDetails(res.data);
+    } catch {}
+  }, [ticker]);
+
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // 가격만 갱신 (15초 폴링용)
@@ -263,11 +282,12 @@ export default function StockDetailPage() {
     fetchChart("1mo");
     fetchMyInfo();
     fetchDividend();
+    fetchDetails();
 
     // 15초마다 가격 자동 갱신
     const priceInterval = setInterval(fetchPrice, 15_000);
     return () => clearInterval(priceInterval);
-  }, [ticker, router, fetchChart, fetchMyInfo, fetchDividend, fetchPrice]);
+  }, [ticker, router, fetchChart, fetchMyInfo, fetchDividend, fetchDetails, fetchPrice]);
 
   // 호가창 열 때만 로드 + 10초마다 갱신
   useEffect(() => {
@@ -638,6 +658,76 @@ export default function StockDetailPage() {
             </div>
           )}
         </div>
+
+        {/* ── 종목 상세 지표 ── */}
+        {details && (details.volume || details.week52_high || details.market_cap || details.per) && (
+          <div className="bg-gray-800 rounded-2xl border border-gray-700 p-4 space-y-3">
+            <div className="text-sm font-semibold text-white">📋 종목 정보</div>
+
+            {/* 52주 고저 바 */}
+            {details.week52_high && details.week52_low && stock && (
+              <div>
+                <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                  <span>52주 최저</span>
+                  <span>52주 최고</span>
+                </div>
+                <div className="relative h-1.5 bg-gray-700 rounded-full">
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-gray-800"
+                    style={{
+                      left: `${Math.min(99, Math.max(1, ((stock.price - details.week52_low) / (details.week52_high - details.week52_low)) * 100))}%`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] text-gray-400 mt-1">
+                  <span>{isUS ? `$${details.week52_low.toFixed(2)}` : details.week52_low.toLocaleString()}</span>
+                  <span>{isUS ? `$${details.week52_high.toFixed(2)}` : details.week52_high.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {/* 지표 그리드 */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs pt-2 border-t border-gray-700/50">
+              {details.day_high != null && details.day_low != null && (
+                <>
+                  <div className="flex justify-between"><span className="text-gray-500">당일 고가</span><span className="text-red-400 font-medium">{isUS ? `$${details.day_high.toFixed(2)}` : details.day_high.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">당일 저가</span><span className="text-blue-400 font-medium">{isUS ? `$${details.day_low.toFixed(2)}` : details.day_low.toLocaleString()}</span></div>
+                </>
+              )}
+              {details.open != null && (
+                <div className="flex justify-between"><span className="text-gray-500">시가</span><span className="text-gray-300 font-medium">{isUS ? `$${details.open.toFixed(2)}` : details.open.toLocaleString()}</span></div>
+              )}
+              {details.prev_close != null && (
+                <div className="flex justify-between"><span className="text-gray-500">전일 종가</span><span className="text-gray-300 font-medium">{isUS ? `$${details.prev_close.toFixed(2)}` : details.prev_close.toLocaleString()}</span></div>
+              )}
+              {details.volume != null && (
+                <div className="flex justify-between"><span className="text-gray-500">거래량</span><span className="text-gray-300 font-medium">{details.volume.toLocaleString()}</span></div>
+              )}
+              {details.avg_volume != null && (
+                <div className="flex justify-between"><span className="text-gray-500">평균 거래량</span><span className="text-gray-300 font-medium">{details.avg_volume.toLocaleString()}</span></div>
+              )}
+              {details.market_cap != null && (
+                <div className="flex justify-between col-span-2"><span className="text-gray-500">시가총액</span><span className="text-yellow-400 font-medium">
+                  {isUS
+                    ? `$${(details.market_cap / 1_000_000_000).toFixed(2)}B`
+                    : details.market_cap >= 1_000_000_000_000
+                      ? `${(details.market_cap / 1_000_000_000_000).toFixed(2)}조원`
+                      : `${(details.market_cap / 100_000_000).toFixed(0)}억원`}
+                </span></div>
+              )}
+              {details.per != null && (
+                <div className="flex justify-between"><span className="text-gray-500">PER</span><span className="text-gray-300 font-medium">{details.per.toFixed(2)}</span></div>
+              )}
+              {details.eps != null && (
+                <div className="flex justify-between"><span className="text-gray-500">EPS</span><span className="text-gray-300 font-medium">{isUS ? `$${details.eps.toFixed(2)}` : details.eps.toLocaleString()}</span></div>
+              )}
+              {details.dividend_yield != null && details.dividend_yield > 0 && (
+                <div className="flex justify-between col-span-2"><span className="text-gray-500">배당 수익률</span><span className="text-green-400 font-medium">{details.dividend_yield.toFixed(2)}%</span></div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── 호가창 ── */}
         <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">

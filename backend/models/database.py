@@ -125,6 +125,26 @@ class ShortPosition(Base):
     closed_at = Column(DateTime, nullable=True)
 
 
+class FuturesSide(str, enum.Enum):
+    LONG = "LONG"   # 매수 포지션
+    SHORT = "SHORT" # 매도 포지션
+
+
+class FuturesPosition(Base):
+    """코스피200 선물 포지션 (10배 레버리지)"""
+    __tablename__ = "futures_positions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    side = Column(Enum(FuturesSide))   # LONG / SHORT
+    contracts = Column(Integer)         # 계약 수
+    entry_price = Column(Float)         # 진입 지수 (KOSPI200)
+    margin = Column(Float)              # 증거금 (계약가치 × 10%)
+    is_open = Column(Boolean, default=True)
+    opened_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
+
+
 class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
     FILLED = "FILLED"

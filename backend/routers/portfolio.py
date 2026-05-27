@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from models.database import get_db, User, Portfolio, AssetSnapshot, ShortPosition, TradeHistory, TradeType, SEED_MONEY
+from models.database import get_db, User, Portfolio, AssetSnapshot, ShortPosition, TradeHistory, TradeType, SEED_MONEY, FuturesPosition
 from services.stock import get_stock_price
 from services.exchange_rate import get_usd_krw
 from services.auth import decode_jwt
+from services.futures import get_kospi200_index, unrealized_pnl as futures_pnl
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -89,7 +90,21 @@ async def get_my_portfolio(user: User = Depends(get_current_user), db: AsyncSess
         cur_price_krw = price_info["price"] * usd_krw if is_us else price_info["price"]
         short_unrealized += (sp.entry_price - cur_price_krw) * sp.quantity
 
-    total_assets = user.cash + total_eval_krw + short_unrealized
+    # 선물 포지션 평가손익
+    fut_result = await db.execute(
+        select(FuturesPosition).where(FuturesPosition.user_id == user.id, FuturesPosition.is_open == True)
+    )
+    fut_positions = fut_result.scalars().all()
+    futures_unrealized = 0.0
+    futures_margin = 0.0
+    if fut_positions:
+        idx = await get_kospi200_index()
+        cur_idx = idx["price"] if idx else 0
+        for fp in fut_positions:
+            futures_unrealized += futures_pnl(fp.side.value, fp.entry_price, cur_idx, fp.contracts)
+            futures_margin += fp.margin
+
+    total_assets = user.cash + total_eval_krw + short_unrealized + futures_margin + futures_unrealized
     total_profit = total_assets - SEED_MONEY
     total_profit_pct = (total_profit / SEED_MONEY) * 100
 
@@ -104,6 +119,8 @@ async def get_my_portfolio(user: User = Depends(get_current_user), db: AsyncSess
         "holdings": holdings,
         "usd_krw": round(usd_krw, 2),
         "short_unrealized": round(short_unrealized, 0),
+        "futures_unrealized": round(futures_unrealized, 0),
+        "futures_margin": round(futures_margin, 0),
     }
 
 

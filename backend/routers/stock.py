@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from services.stock import get_stock_price, search_stock, get_popular_stocks
+from services.stock import get_stock_price, search_stock, get_popular_stocks, get_popular_etfs
 from services.market_hours import get_market_status
 from services.exchange_rate import get_usd_krw
 from datetime import datetime
@@ -28,6 +28,12 @@ async def stock_search(q: str = Query(...), market: str = Query("ALL")):
 async def popular_stocks(market: str = Query("ALL")):
     """인기 종목 리스트"""
     return await get_popular_stocks(market)
+
+
+@router.get("/popular-etfs")
+async def popular_etfs(market: str = Query("ALL")):
+    """인기 ETF 리스트"""
+    return await get_popular_etfs(market)
 
 
 @router.get("/market-status")
@@ -93,6 +99,69 @@ async def exchange_rate():
     """USD/KRW 환율 조회"""
     rate = await get_usd_krw()
     return {"usd_krw": rate}
+
+
+@router.get("/details/{ticker}")
+async def stock_details(ticker: str):
+    """종목 상세 지표 - 거래량, 52주 고저, 시가총액, PER 등"""
+    is_kr = ticker.replace("-", "").isdigit()
+    yahoo_ticker = f"{ticker}.KS" if is_kr else ticker
+
+    result = {
+        "ticker": ticker,
+        "volume": None,
+        "avg_volume": None,
+        "market_cap": None,
+        "week52_high": None,
+        "week52_low": None,
+        "day_high": None,
+        "day_low": None,
+        "open": None,
+        "prev_close": None,
+        "per": None,
+        "eps": None,
+        "dividend_yield": None,
+    }
+
+    # 1. Yahoo Finance quoteSummary - 모든 지표
+    try:
+        url = (
+            f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{yahoo_ticker}"
+            f"?modules=summaryDetail,defaultKeyStatistics,price"
+        )
+        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.get(url, headers=headers)
+            data = resp.json()
+        modules = data.get("quoteSummary", {}).get("result", [{}])[0]
+        summary = modules.get("summaryDetail", {})
+        keystat = modules.get("defaultKeyStatistics", {})
+        price = modules.get("price", {})
+
+        def raw(d, k):
+            v = d.get(k)
+            if isinstance(v, dict):
+                return v.get("raw")
+            return v
+
+        result["volume"] = raw(summary, "volume")
+        result["avg_volume"] = raw(summary, "averageVolume")
+        result["market_cap"] = raw(summary, "marketCap") or raw(price, "marketCap")
+        result["week52_high"] = raw(summary, "fiftyTwoWeekHigh")
+        result["week52_low"] = raw(summary, "fiftyTwoWeekLow")
+        result["day_high"] = raw(summary, "dayHigh")
+        result["day_low"] = raw(summary, "dayLow")
+        result["open"] = raw(summary, "open")
+        result["prev_close"] = raw(summary, "previousClose")
+        result["per"] = raw(summary, "trailingPE") or raw(keystat, "trailingPE")
+        result["eps"] = raw(keystat, "trailingEps")
+        dy = raw(summary, "dividendYield")
+        if dy:
+            result["dividend_yield"] = dy * 100 if dy < 1 else dy
+    except Exception as e:
+        print(f"종목 상세 조회 오류 ({ticker}): {e}")
+
+    return result
 
 
 @router.get("/orderbook/{ticker}")
