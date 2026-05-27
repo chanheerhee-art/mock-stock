@@ -168,6 +168,19 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+        # 컬럼 마이그레이션 (없으면 추가, 있으면 무시)
+        migrations = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP",
+        ]
+        for sql in migrations:
+            try:
+                from sqlalchemy import text
+                await conn.execute(text(sql))
+            except Exception as e:
+                print(f"[Migration] 스킵: {e}")
+
     # 첫 시즌 자동 생성
     async with AsyncSessionLocal() as session:
         from sqlalchemy import select
