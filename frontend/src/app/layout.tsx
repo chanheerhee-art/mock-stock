@@ -45,6 +45,13 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="모의주식" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        {/* 카카오 SDK */}
+        <script
+          src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"
+          integrity="sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4"
+          crossOrigin="anonymous"
+          async
+        />
       </head>
       <body className="bg-gray-950 text-white min-h-screen">
         {children}

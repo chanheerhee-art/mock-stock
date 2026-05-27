@@ -214,17 +214,45 @@ export default function RankingPage() {
   }, [router]);
 
   const handleShare = () => {
-    const url = window.location.origin + "/ranking";
-    const top = ranking[0];
-    const text = top
-      ? `📈 모의주식 랭킹\n🥇 ${top.nickname} +${top.profit_pct.toFixed(2)}%\n나는 몇 위일까? 확인해봐!`
-      : "📈 모의주식 랭킹 확인해봐!";
+    const pageUrl = "https://mock-stock-app.vercel.app/ranking";
+    const ogImageUrl = "https://mock-stock-app.vercel.app/ranking/opengraph-image";
+    const top3 = ranking.slice(0, 3);
+    const MEDAL = ["🥇", "🥈", "🥉"];
 
+    const descLines = top3.length > 0
+      ? top3.map((u, i) => `${MEDAL[i]} ${u.nickname} ${u.profit_pct >= 0 ? "+" : ""}${u.profit_pct.toFixed(2)}%`).join("\n")
+      : "아직 참여자가 없어요";
+
+    // 카카오링크 SDK
+    const win = window as typeof window & { Kakao?: { isInitialized: () => boolean; init: (key: string) => void; Share: { sendDefault: (opts: unknown) => void } } };
+    if (win.Kakao) {
+      if (!win.Kakao.isInitialized()) {
+        win.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID!);
+      }
+      win.Kakao.Share.sendDefault({
+        objectType: "feed",
+        content: {
+          title: "📈 모의주식 랭킹",
+          description: descLines + "\n\n나는 몇 위일까? 확인해봐!",
+          imageUrl: ogImageUrl,
+          imageWidth: 1200,
+          imageHeight: 630,
+          link: { mobileWebUrl: pageUrl, webUrl: pageUrl },
+        },
+        buttons: [
+          { title: "🏆 랭킹 확인하기", link: { mobileWebUrl: pageUrl, webUrl: pageUrl } },
+        ],
+      });
+      return;
+    }
+
+    // 카카오 SDK 없으면 네이티브 공유 or 클립보드
+    const text = `📈 모의주식 랭킹\n${descLines}\n\n나는 몇 위일까? 확인해봐!\n${pageUrl}`;
     if (navigator.share) {
-      navigator.share({ title: "모의주식 랭킹", text, url });
+      navigator.share({ title: "모의주식 랭킹", text, url: pageUrl });
     } else {
-      navigator.clipboard.writeText(`${text}\n${url}`);
-      alert("링크 복사됨! 카톡에 붙여넣기 하세요 😊");
+      navigator.clipboard.writeText(text);
+      alert("클립보드에 복사됐어요! 카톡에 붙여넣기 하세요 😊");
     }
   };
 
