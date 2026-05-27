@@ -215,7 +215,7 @@ export default function RankingPage() {
 
   const handleShare = () => {
     const pageUrl = "https://mock-stock-app.vercel.app/ranking";
-    const ogImageUrl = "https://mock-stock-app.vercel.app/ranking/opengraph-image";
+    const ogImageUrl = "https://mock-stock-app.vercel.app/icon-512.png";
     const top3 = ranking.slice(0, 3);
     const MEDAL = ["🥇", "🥈", "🥉"];
 
