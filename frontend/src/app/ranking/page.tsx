@@ -219,8 +219,9 @@ export default function RankingPage() {
     const top3 = ranking.slice(0, 3);
     const MEDAL = ["🥇", "🥈", "🥉"];
 
-    const descLines = top3.length > 0
-      ? top3.map((u, i) => `${MEDAL[i]} ${u.nickname}  ${u.profit_pct >= 0 ? "+" : ""}${u.profit_pct.toFixed(1)}%`).join("  ")
+    const top1 = top3[0];
+    const descLines = top1
+      ? `🥇 ${top1.nickname} +${top1.profit_pct.toFixed(2)}% · 나는 몇 위?`
       : "아직 참여자가 없어요";
 
     // 카카오링크 SDK
