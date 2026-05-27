@@ -165,6 +165,12 @@ export default function StockDetailPage() {
   const [showOrderbook, setShowOrderbook] = useState(false);
   const [showDividend, setShowDividend] = useState(false);
 
+  // 뉴스
+  interface NewsItem { title: string; url: string; source: string; published_at: string; thumbnail?: string; }
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [showNews, setShowNews] = useState(false);
+  const [newsLoading, setNewsLoading] = useState(false);
+
   const isUS = stock?.market === "US";
   const isTradeAllowed = marketStatus?.is_open ?? false;
   const heldQty = myInfo?.holdings.find(h => h.ticker === ticker)?.quantity ?? 0;
@@ -208,6 +214,15 @@ export default function StockDetailPage() {
       const res = await api.get(`/stock/dividends/${ticker}`);
       setDividendInfo(res.data);
     } catch {}
+  }, [ticker]);
+
+  const fetchNews = useCallback(async () => {
+    setNewsLoading(true);
+    try {
+      const res = await api.get(`/stock/news/${ticker}`);
+      setNews(res.data.news ?? []);
+    } catch {}
+    setNewsLoading(false);
   }, [ticker]);
 
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -261,6 +276,12 @@ export default function StockDetailPage() {
     const id = setInterval(fetchOrderbook, 10_000);
     return () => clearInterval(id);
   }, [showOrderbook, fetchOrderbook]);
+
+  // 뉴스: 열 때 한 번만 로드
+  useEffect(() => {
+    if (!showNews || news.length > 0) return;
+    fetchNews();
+  }, [showNews, news.length, fetchNews]);
 
   const handlePeriod = (p: string) => {
     setPeriod(p);
@@ -763,6 +784,58 @@ export default function StockDetailPage() {
 
               {dividendInfo.dividends.length === 0 && dividendInfo.splits.length === 0 && !dividendInfo.dividend_yield && (
                 <div className="text-xs text-gray-500 text-center py-2">배당 정보가 없습니다</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 📰 뉴스 */}
+        <div className="bg-gray-900 rounded-2xl overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between px-4 py-3"
+            onClick={() => setShowNews(v => !v)}
+          >
+            <span className="text-sm font-semibold text-white">📰 관련 뉴스</span>
+            <span className="text-gray-500 text-xs">{showNews ? "▲ 접기" : "▼ 펼치기"}</span>
+          </button>
+          {showNews && (
+            <div className="px-4 pb-4 space-y-2 border-t border-gray-800 pt-3">
+              {newsLoading ? (
+                <div className="text-center text-gray-500 text-xs py-4 animate-pulse">뉴스 불러오는 중...</div>
+              ) : news.length === 0 ? (
+                <div className="text-center text-gray-500 text-xs py-4">관련 뉴스가 없습니다</div>
+              ) : news.map((item, i) => (
+                <a
+                  key={i}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex gap-3 items-start p-3 rounded-xl bg-gray-800 hover:bg-gray-750 active:bg-gray-700 transition-colors"
+                >
+                  {item.thumbnail && (
+                    <img
+                      src={item.thumbnail}
+                      alt=""
+                      className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-white font-medium leading-4 line-clamp-2">{item.title}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-xs text-blue-400 font-medium">{item.source}</span>
+                      <span className="text-xs text-gray-500">{item.published_at}</span>
+                    </div>
+                  </div>
+                </a>
+              ))}
+              {news.length > 0 && (
+                <button
+                  onClick={fetchNews}
+                  className="w-full text-xs text-gray-500 hover:text-gray-300 pt-1 transition-colors"
+                >
+                  🔄 새로고침
+                </button>
               )}
             </div>
           )}

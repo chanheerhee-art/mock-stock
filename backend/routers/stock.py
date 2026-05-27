@@ -146,6 +146,45 @@ async def orderbook(ticker: str):
     }
 
 
+@router.get("/news/{ticker}")
+async def stock_news(ticker: str):
+    """종목 관련 뉴스 — Yahoo Finance RSS + Finviz"""
+    is_kr = ticker.replace("-", "").isdigit()
+    yahoo_ticker = f"{ticker}.KS" if is_kr else ticker
+
+    news_list = []
+
+    try:
+        # Yahoo Finance v1 news API
+        url = f"https://query1.finance.yahoo.com/v1/finance/search?q={yahoo_ticker}&newsCount=10&quotesCount=0"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, headers=headers)
+            data = resp.json()
+
+        raw_news = data.get("news", [])
+        for item in raw_news[:10]:
+            pub_ts = item.get("providerPublishTime", 0)
+            pub_dt = datetime.fromtimestamp(pub_ts).strftime("%Y-%m-%d %H:%M") if pub_ts else ""
+            thumbnail = None
+            thumbs = item.get("thumbnail", {})
+            if thumbs:
+                resolutions = thumbs.get("resolutions", [])
+                if resolutions:
+                    thumbnail = resolutions[0].get("url")
+            news_list.append({
+                "title": item.get("title", ""),
+                "url": item.get("link", ""),
+                "source": item.get("publisher", ""),
+                "published_at": pub_dt,
+                "thumbnail": thumbnail,
+            })
+    except Exception as e:
+        print(f"뉴스 조회 오류 ({ticker}): {e}")
+
+    return {"ticker": ticker, "news": news_list}
+
+
 @router.get("/dividends/{ticker}")
 async def dividends(ticker: str):
     """배당 정보 — Yahoo Finance dividends 데이터"""

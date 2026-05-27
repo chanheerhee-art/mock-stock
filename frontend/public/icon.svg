@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#030712"/>
+  <rect width="512" height="512" rx="100" fill="url(#grad)"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2744;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#030712;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- 차트 라인 -->
+  <polyline points="60,340 140,280 200,310 280,200 340,240 400,140 460,160"
+    fill="none" stroke="#22c55e" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 상승 화살표 -->
+  <polygon points="400,90 460,160 340,160" fill="#22c55e" opacity="0.9"/>
+  <!-- 텍스트 -->
+  <text x="256" y="430" font-family="Arial, sans-serif" font-size="80" font-weight="bold"
+    fill="white" text-anchor="middle">주식</text>
+</svg>

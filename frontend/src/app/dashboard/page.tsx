@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from "recharts";
+import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis, BarChart, Bar, Cell, XAxis } from "recharts";
 import api from "@/lib/api";
 
 // ── 종목 상세 모달 ─────────────────────────────────────────
@@ -146,6 +146,28 @@ interface Portfolio {
 
 interface ChartPoint { date: string; total_assets: number; profit_pct: number; }
 
+interface Report {
+  summary: {
+    total_assets: number;
+    total_profit_pct: number;
+    total_realized: number;
+    total_unrealized: number;
+    peak_assets: number;
+    peak_pct: number;
+    trough_pct: number;
+  };
+  trade_stats: {
+    total_trades: number;
+    buy_count: number;
+    sell_count: number;
+    total_buy_amount: number;
+    total_sell_amount: number;
+    most_traded: { ticker: string; name: string; count: number }[];
+  };
+  realized_pnl: { ticker: string; name: string; market: string; realized_profit: number; realized_pct: number; sell_total: number }[];
+  unrealized_pnl: { ticker: string; name: string; market: string; unrealized_profit: number; unrealized_pct: number; quantity: number }[];
+}
+
 const EXCHANGE_BADGE: Record<string, string> = {
   KOSPI: "bg-blue-500/20 text-blue-400",
   KOSDAQ: "bg-green-500/20 text-green-400",
@@ -162,6 +184,19 @@ export default function Dashboard() {
   const [shortPositions, setShortPositions] = useState<ShortPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedHolding, setSelectedHolding] = useState<Holding | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+
+  const fetchReport = useCallback(async () => {
+    if (reportLoading) return;
+    setReportLoading(true);
+    try {
+      const res = await api.get("/portfolio/report");
+      setReport(res.data);
+    } catch {}
+    setReportLoading(false);
+  }, [reportLoading]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -352,21 +387,155 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">
-                      {h.quantity}주 · 평단 {h.avg_price.toLocaleString()}원
+                      {h.quantity}주
+                      {h.is_us && <span className="ml-1 text-gray-500">${h.current_price.toFixed(2)}</span>}
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold text-white">{h.eval_amount.toLocaleString()}원</div>
-                    {h.is_us && (
-                      <div className="text-xs text-gray-500">${h.current_price.toFixed(2)}</div>
-                    )}
                     <div className={`text-xs font-semibold mt-0.5 ${h.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
-                      {h.profit >= 0 ? "+" : ""}{h.profit_pct.toFixed(2)}%
+                      {h.profit >= 0 ? "▲ +" : "▼ "}{h.profit_pct.toFixed(2)}%
+                      <span className="text-gray-500 ml-1 font-normal">
+                        ({h.profit >= 0 ? "+" : ""}{h.profit.toLocaleString()}원)
+                      </span>
                     </div>
                   </div>
                 </div>
               </button>
             ))}
+          </div>
+        )}
+      </div>
+      {/* 📊 성과 리포트 */}
+      <div className="bg-gray-900 rounded-2xl overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3.5"
+          onClick={() => {
+            setShowReport(v => !v);
+            if (!report && !showReport) fetchReport();
+          }}
+        >
+          <span className="text-sm font-semibold text-white">📊 나의 성과 리포트</span>
+          <span className="text-gray-500 text-xs">{showReport ? "▲ 접기" : "▼ 펼치기"}</span>
+        </button>
+
+        {showReport && (
+          <div className="border-t border-gray-800 px-4 pb-5 pt-3 space-y-5">
+            {reportLoading ? (
+              <div className="text-center text-gray-500 text-xs py-6 animate-pulse">리포트 계산 중...</div>
+            ) : !report ? null : (
+              <>
+                {/* 요약 카드 */}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "역대 최고 수익률", value: `+${report.summary.peak_pct.toFixed(2)}%`, color: "text-red-400" },
+                    { label: "역대 최저 수익률", value: `${report.summary.trough_pct.toFixed(2)}%`, color: report.summary.trough_pct >= 0 ? "text-red-400" : "text-blue-400" },
+                    { label: "실현 손익", value: `${report.summary.total_realized >= 0 ? "+" : ""}${report.summary.total_realized.toLocaleString()}원`, color: report.summary.total_realized >= 0 ? "text-red-400" : "text-blue-400" },
+                    { label: "미실현 손익", value: `${report.summary.total_unrealized >= 0 ? "+" : ""}${report.summary.total_unrealized.toLocaleString()}원`, color: report.summary.total_unrealized >= 0 ? "text-red-400" : "text-blue-400" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="bg-gray-800 rounded-xl p-3">
+                      <div className="text-xs text-gray-500 mb-1">{label}</div>
+                      <div className={`text-sm font-bold ${color}`}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 거래 통계 */}
+                <div>
+                  <div className="text-xs text-gray-500 mb-2 font-medium">거래 통계</div>
+                  <div className="bg-gray-800 rounded-xl p-3 space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">총 거래 횟수</span>
+                      <span className="text-white font-semibold">{report.trade_stats.total_trades}회</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">매수 / 매도</span>
+                      <span className="text-white font-semibold">
+                        <span className="text-red-400">{report.trade_stats.buy_count}회</span>
+                        {" / "}
+                        <span className="text-blue-400">{report.trade_stats.sell_count}회</span>
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">총 매수 금액</span>
+                      <span className="text-white font-semibold">{report.trade_stats.total_buy_amount.toLocaleString()}원</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 많이 거래한 종목 */}
+                {report.trade_stats.most_traded.length > 0 && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2 font-medium">자주 거래한 종목 TOP {report.trade_stats.most_traded.length}</div>
+                    <div className="space-y-1.5">
+                      {report.trade_stats.most_traded.map((t, i) => (
+                        <div key={t.ticker} className="flex items-center justify-between bg-gray-800 rounded-xl px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 w-4">{i + 1}</span>
+                            <span className="text-xs text-white font-medium">{t.name}</span>
+                            <span className="text-xs text-gray-500">{t.ticker}</span>
+                          </div>
+                          <span className="text-xs text-yellow-400 font-semibold">{t.count}회</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 실현 손익 TOP */}
+                {report.realized_pnl.length > 0 && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2 font-medium">종목별 실현 손익</div>
+                    <div className="space-y-1.5">
+                      {report.realized_pnl.slice(0, 5).map((p) => (
+                        <div key={p.ticker} className="flex items-center justify-between bg-gray-800 rounded-xl px-3 py-2">
+                          <div>
+                            <span className="text-xs text-white font-medium">{p.name}</span>
+                            <span className="text-xs text-gray-500 ml-1.5">{p.ticker}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-xs font-bold ${p.realized_profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                              {p.realized_profit >= 0 ? "+" : ""}{p.realized_profit.toLocaleString()}원
+                            </div>
+                            <div className={`text-xs ${p.realized_pct >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                              {p.realized_pct >= 0 ? "+" : ""}{p.realized_pct.toFixed(2)}%
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 수익/손실 분포 차트 */}
+                {report.realized_pnl.length > 0 && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2 font-medium">종목별 손익 분포</div>
+                    <div className="h-28">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={report.realized_pnl.slice(0, 6)} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+                          <XAxis dataKey="ticker" tick={{ fontSize: 9, fill: "#6b7280" }} />
+                          <Tooltip
+                            contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 10 }}
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            formatter={(v: any) => [`${Number(v) >= 0 ? "+" : ""}${Number(v).toLocaleString()}원`, "실현손익"]}
+                          />
+                          <Bar dataKey="realized_profit" radius={[3, 3, 0, 0]}>
+                            {report.realized_pnl.slice(0, 6).map((entry, i) => (
+                              <Cell key={i} fill={entry.realized_profit >= 0 ? "#f87171" : "#60a5fa"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {report.realized_pnl.length === 0 && report.trade_stats.sell_count === 0 && (
+                  <div className="text-center text-gray-500 text-xs py-3">매도 거래가 없어서 실현 손익이 없어요</div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
