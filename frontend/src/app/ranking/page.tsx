@@ -227,7 +227,7 @@ export default function RankingPage() {
     const win = window as typeof window & { Kakao?: { isInitialized: () => boolean; init: (key: string) => void; Share: { sendDefault: (opts: unknown) => void } } };
     if (win.Kakao) {
       if (!win.Kakao.isInitialized()) {
-        win.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID!);
+        win.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_JS_KEY!);
       }
       win.Kakao.Share.sendDefault({
         objectType: "feed",
