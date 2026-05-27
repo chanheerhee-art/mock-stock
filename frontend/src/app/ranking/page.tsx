@@ -220,7 +220,7 @@ export default function RankingPage() {
     const MEDAL = ["🥇", "🥈", "🥉"];
 
     const descLines = top3.length > 0
-      ? top3.map((u, i) => `${MEDAL[i]} ${u.nickname} ${u.profit_pct >= 0 ? "+" : ""}${u.profit_pct.toFixed(2)}%`).join("\n")
+      ? top3.map((u, i) => `${MEDAL[i]} ${u.nickname}  ${u.profit_pct >= 0 ? "+" : ""}${u.profit_pct.toFixed(1)}%`).join("  ")
       : "아직 참여자가 없어요";
 
     // 카카오링크 SDK
