@@ -9,8 +9,6 @@ from services.auth import decode_jwt
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
-SEED_MONEY = 10_000_000
-
 
 async def get_current_user(authorization: str = Header(...), db: AsyncSession = Depends(get_db)) -> User:
     try:
@@ -272,4 +270,3 @@ async def get_performance_report(user: User = Depends(get_current_user), db: Asy
         # 현재 보유 미실현 손익
         "unrealized_pnl": holding_profits[:10],
     }
-# Wed May 27 10:12:17 KST 2026
