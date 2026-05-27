@@ -67,6 +67,8 @@ async def stock_chart(ticker: str, period: str = Query("1mo")):
         highs = quotes.get("high", [])
         lows = quotes.get("low", [])
 
+        volumes = quotes.get("volume", [])
+
         result = []
         for i, ts in enumerate(timestamps):
             if i >= len(closes) or closes[i] is None:
@@ -78,6 +80,7 @@ async def stock_chart(ticker: str, period: str = Query("1mo")):
                 "open": round(opens[i], 2) if opens and i < len(opens) and opens[i] else None,
                 "high": round(highs[i], 2) if highs and i < len(highs) and highs[i] else None,
                 "low": round(lows[i], 2) if lows and i < len(lows) and lows[i] else None,
+                "volume": int(volumes[i]) if volumes and i < len(volumes) and volumes[i] else 0,
             })
         return result
     except Exception as e:

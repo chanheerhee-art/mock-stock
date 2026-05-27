@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import os
 
 from models.database import get_db, User
-from services.auth import kakao_get_token, kakao_get_user, create_jwt
+from services.auth import kakao_get_token, kakao_get_user, create_jwt, decode_jwt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -64,3 +64,50 @@ async def kakao_callback(code: str, db: AsyncSession = Depends(get_db)):
 
     token = create_jwt(user.id, user.kakao_id)
     return {"token": token, "nickname": user.nickname, "profile_image": user.profile_image}
+
+
+@router.get("/token-status")
+async def token_status(authorization: str = Header(...), db: AsyncSession = Depends(get_db)):
+    """내 카카오 토큰 저장 상태 확인 (검증용)"""
+    try:
+        payload = decode_jwt(authorization.replace("Bearer ", ""))
+        user_id = int(payload["sub"])
+    except Exception:
+        raise HTTPException(status_code=401, detail="인증 필요")
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저 없음")
+
+    from datetime import datetime
+    return {
+        "has_access_token": bool(user.kakao_access_token),
+        "has_refresh_token": bool(user.kakao_refresh_token),
+        "token_expires": user.kakao_token_expires.isoformat() if user.kakao_token_expires else None,
+        "is_expired": (
+            user.kakao_token_expires < datetime.utcnow()
+            if user.kakao_token_expires else True
+        ),
+    }
+
+
+@router.post("/test-notify")
+async def test_notify(authorization: str = Header(...), db: AsyncSession = Depends(get_db)):
+    """카카오 알림 테스트 전송"""
+    try:
+        payload = decode_jwt(authorization.replace("Bearer ", ""))
+        user_id = int(payload["sub"])
+    except Exception:
+        raise HTTPException(status_code=401, detail="인증 필요")
+
+    from services.kakao_notify import send_order_filled_notify
+    await send_order_filled_notify(user_id, {
+        "name": "테스트 종목",
+        "ticker": "TEST",
+        "trade_type": "BUY",
+        "quantity": 10,
+        "price": 150000,
+        "total": 1500000,
+    })
+    return {"message": "알림 전송 시도 완료 — 카카오톡을 확인하세요"}

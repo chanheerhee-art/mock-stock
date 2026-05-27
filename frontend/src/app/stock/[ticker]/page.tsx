@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, ReferenceLine, Cell,
+  ResponsiveContainer, ReferenceLine, Cell, CartesianGrid,
 } from "recharts";
 import api from "@/lib/api";
 
@@ -26,6 +26,7 @@ interface ChartPoint {
   open?: number;
   high?: number;
   low?: number;
+  volume?: number;
 }
 
 // 캔들스틱 렌더링용
@@ -35,11 +36,10 @@ interface CandleBar {
   close: number;
   high: number;
   low: number;
+  volume: number;
   isUp: boolean;
-  // recharts Bar용: [low, high] 범위
-  bodyRange: [number, number];  // [open, close] 정렬
-  wickRange: [number, number];  // [low, high]
-  // 표시용
+  bodyRange: [number, number];
+  wickRange: [number, number];
   bodyLow: number;
   bodyHigh: number;
 }
@@ -308,6 +308,7 @@ export default function StockDetailPage() {
       return {
         date: c.date,
         open, close, high, low,
+        volume: c.volume ?? 0,
         isUp: up,
         bodyLow: Math.min(open, close),
         bodyHigh: Math.max(open, close),
@@ -466,67 +467,113 @@ export default function StockDetailPage() {
               차트 데이터가 없어요
             </div>
           ) : chartType === "candle" && hasCandleData ? (
-            /* ── 캔들차트 ── */
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={candleData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} axisLine={false}
-                    interval="preserveStartEnd" tickFormatter={(v) => v.slice(5)} />
-                  <YAxis domain={["auto", "auto"]} tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false}
-                    axisLine={false} width={55}
-                    tickFormatter={(v) => isUS ? `$${v}` : `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload as CandleBar;
-                      const fmt = (v: number) => isUS ? `$${v.toFixed(2)}` : `${v.toLocaleString()}원`;
-                      return (
-                        <div className="bg-gray-800 border border-gray-600 rounded-xl p-3 text-xs space-y-1">
-                          <div className="text-gray-400">{d.date}</div>
-                          <div className="flex gap-3">
-                            <div><span className="text-gray-500">시 </span><span className="text-white">{fmt(d.open)}</span></div>
-                            <div><span className="text-gray-500">고 </span><span className="text-red-400">{fmt(d.high)}</span></div>
+            /* ── 캔들차트 + 거래량 ── */
+            <div className="space-y-1">
+              {/* 가격 차트 */}
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={candleData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={false} tickLine={false} axisLine={false} height={0} />
+                    <YAxis domain={["auto", "auto"]} tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false}
+                      axisLine={false} width={55}
+                      tickFormatter={(v) => isUS ? `$${v}` : `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload as CandleBar;
+                        const fmt = (v: number) => isUS ? `$${v.toFixed(2)}` : `${v.toLocaleString()}원`;
+                        const vol = d.volume >= 1_000_000
+                          ? `${(d.volume / 1_000_000).toFixed(1)}M`
+                          : d.volume >= 1_000 ? `${(d.volume / 1_000).toFixed(0)}K`
+                          : `${d.volume}`;
+                        return (
+                          <div className="bg-gray-800 border border-gray-600 rounded-xl p-3 text-xs space-y-1">
+                            <div className="text-gray-400">{d.date}</div>
+                            <div className="flex gap-3">
+                              <div><span className="text-gray-500">시 </span><span className="text-white">{fmt(d.open)}</span></div>
+                              <div><span className="text-gray-500">고 </span><span className="text-red-400">{fmt(d.high)}</span></div>
+                            </div>
+                            <div className="flex gap-3">
+                              <div><span className="text-gray-500">저 </span><span className="text-blue-400">{fmt(d.low)}</span></div>
+                              <div><span className="text-gray-500">종 </span><span className={d.isUp ? "text-red-400" : "text-blue-400"}>{fmt(d.close)}</span></div>
+                            </div>
+                            <div className="text-gray-500 pt-0.5 border-t border-gray-700">거래량 {vol}</div>
                           </div>
-                          <div className="flex gap-3">
-                            <div><span className="text-gray-500">저 </span><span className="text-blue-400">{fmt(d.low)}</span></div>
-                            <div><span className="text-gray-500">종 </span><span className={d.isUp ? "text-red-400" : "text-blue-400"}>{fmt(d.close)}</span></div>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  {basePrice && <ReferenceLine y={basePrice} stroke="#374151" strokeDasharray="3 3" />}
-                  {/* 심지: low-high */}
-                  <Bar dataKey="wickRange" shape={<CandleShape />} isAnimationActive={false}>
-                    {candleData.map((d, i) => (
-                      <Cell key={i} fill={d.isUp ? "#f87171" : "#60a5fa"} />
-                    ))}
-                  </Bar>
-                </ComposedChart>
-              </ResponsiveContainer>
+                        );
+                      }}
+                    />
+                    {basePrice && <ReferenceLine y={basePrice} stroke="#374151" strokeDasharray="3 3" />}
+                    <Bar dataKey="wickRange" shape={<CandleShape />} isAnimationActive={false}>
+                      {candleData.map((d, i) => (
+                        <Cell key={i} fill={d.isUp ? "#f87171" : "#60a5fa"} />
+                      ))}
+                    </Bar>
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              {/* 거래량 바 */}
+              <div className="h-12">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={candleData} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={false}
+                      interval="preserveStartEnd" tickFormatter={(v) => v.slice(5)} height={14} />
+                    <YAxis hide domain={[0, "auto"]} />
+                    <Bar dataKey="volume" isAnimationActive={false} radius={[1, 1, 0, 0]}>
+                      {candleData.map((d, i) => (
+                        <Cell key={i} fill={d.isUp ? "rgba(248,113,113,0.5)" : "rgba(96,165,250,0.5)"} />
+                      ))}
+                    </Bar>
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           ) : (
-            /* ── 라인차트 ── */
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chart} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} axisLine={false}
-                    interval="preserveStartEnd" tickFormatter={(v) => v.slice(5)} />
-                  <YAxis domain={["auto", "auto"]} tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false}
-                    axisLine={false} width={55}
-                    tickFormatter={(v) => isUS ? `$${v}` : `${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    formatter={(v: any) => [isUS ? `$${Number(v).toFixed(2)}` : `${Number(v).toLocaleString()}원`, "종가"]}
-                    labelStyle={{ color: "#9ca3af" }}
-                  />
-                  {basePrice && <ReferenceLine y={basePrice} stroke="#374151" strokeDasharray="3 3" />}
-                  <Line type="monotone" dataKey="close" stroke={lineColor} strokeWidth={2} dot={false}
-                    activeDot={{ r: 4, fill: lineColor }} />
-                </ComposedChart>
-              </ResponsiveContainer>
+            /* ── 라인차트 + 거래량 ── */
+            <div className="space-y-1">
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chart} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={false} tickLine={false} axisLine={false} height={0} />
+                    <YAxis domain={["auto", "auto"]} tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false}
+                      axisLine={false} width={55}
+                      tickFormatter={(v) => isUS ? `$${v}` : `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload as ChartPoint;
+                        const fmt = (v: number) => isUS ? `$${v.toFixed(2)}` : `${v.toLocaleString()}원`;
+                        const vol = (d.volume ?? 0) >= 1_000_000
+                          ? `${((d.volume ?? 0) / 1_000_000).toFixed(1)}M`
+                          : (d.volume ?? 0) >= 1_000 ? `${((d.volume ?? 0) / 1_000).toFixed(0)}K`
+                          : `${d.volume ?? 0}`;
+                        return (
+                          <div className="bg-gray-800 border border-gray-600 rounded-xl p-3 text-xs space-y-1">
+                            <div className="text-gray-400">{d.date}</div>
+                            <div><span className="text-gray-500">종가 </span><span className="text-white">{fmt(d.close)}</span></div>
+                            <div className="text-gray-500">거래량 {vol}</div>
+                          </div>
+                        );
+                      }}
+                    />
+                    {basePrice && <ReferenceLine y={basePrice} stroke="#374151" strokeDasharray="3 3" />}
+                    <Line type="monotone" dataKey="close" stroke={lineColor} strokeWidth={2} dot={false}
+                      activeDot={{ r: 4, fill: lineColor }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              {/* 거래량 바 */}
+              <div className="h-12">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chart} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
+                    <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 9 }} tickLine={false} axisLine={false}
+                      interval="preserveStartEnd" tickFormatter={(v) => v.slice(5)} height={14} />
+                    <YAxis hide domain={[0, "auto"]} />
+                    <Bar dataKey="volume" fill={`${lineColor}55`} isAnimationActive={false} radius={[1, 1, 0, 0]} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
 
