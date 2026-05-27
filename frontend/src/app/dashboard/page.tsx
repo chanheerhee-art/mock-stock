@@ -387,8 +387,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">
-                      {h.quantity}주
-                      {h.is_us && <span className="ml-1 text-gray-500">${h.current_price.toFixed(2)}</span>}
+                      {h.quantity}주 · 평가 {h.eval_amount.toLocaleString()}원
                     </div>
                   </div>
                   <div className="text-right">
@@ -397,11 +396,11 @@ export default function Dashboard() {
                         ? `$${h.current_price.toFixed(2)}`
                         : `${h.current_price_krw.toLocaleString()}원`}
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      {h.profit >= 0 ? "+" : ""}{h.profit.toLocaleString()}원
-                    </div>
-                    <div className={`text-xs font-semibold ${h.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                    <div className={`text-xs font-semibold mt-0.5 ${h.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
                       {h.profit >= 0 ? "▲ +" : "▼ "}{h.profit_pct.toFixed(2)}%
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {h.profit >= 0 ? "+" : ""}{h.profit.toLocaleString()}원
                     </div>
                   </div>
                 </div>
