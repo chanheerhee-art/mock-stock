@@ -387,7 +387,7 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">
-                      {h.quantity}주 · 평가 {h.eval_amount.toLocaleString()}원
+                      {h.quantity}주 · 평단 {h.avg_price.toLocaleString()}원
                     </div>
                   </div>
                   <div className="text-right">
