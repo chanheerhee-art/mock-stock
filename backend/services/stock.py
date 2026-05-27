@@ -34,13 +34,13 @@ POPULAR_US = ["AAPL", "NVDA", "TSLA", "MSFT", "GOOGL", "META", "AMZN", "PLTR"]
 # 인기 ETF (국내 + 미국)
 POPULAR_ETF_KR = [
     "069500",  # KODEX 200
-    "229200",  # KODEX 코스닥150
     "133690",  # KODEX 미국나스닥100
     "360750",  # TIGER 미국S&P500
-    "381170",  # TIGER 미국테크TOP10
-    "114800",  # KODEX 인버스
     "122630",  # KODEX 레버리지
-    "251340",  # KODEX 코스닥150 선물인버스
+    "114800",  # KODEX 인버스
+    "0193T0",  # KODEX SK하이닉스단일종목레버리지
+    "0193W0",  # KODEX 삼성전자단일종목레버리지
+    "252670",  # KODEX 200선물인버스2X
 ]
 POPULAR_ETF_US = ["SPY", "QQQ", "VOO", "VTI", "IVV", "DIA", "IWM", "ARKK"]
 
@@ -54,12 +54,15 @@ ETF_NAME_KO: dict[str, str] = {
     "114800": "KODEX 인버스",
     "122630": "KODEX 레버리지",
     "251340": "KODEX 코스닥150 선물인버스",
+    "252670": "KODEX 200선물인버스2X",
     "102110": "TIGER 200",
     "278530": "KODEX 200TR",
     "305720": "KODEX 2차전지산업",
     "091160": "KODEX 반도체",
     "091180": "KODEX 자동차",
     "117460": "KODEX 에너지화학",
+    "0193T0": "KODEX SK하이닉스단일종목레버리지",
+    "0193W0": "KODEX 삼성전자단일종목레버리지",
 }
 
 # 미국 주식 한글 이름 매핑 (~300개)
@@ -1615,27 +1618,48 @@ async def get_yahoo_price(ticker: str) -> Optional[dict]:
             return None
 
 
+def _is_kr_ticker(ticker: str) -> bool:
+    """한국 종목 ticker 판별
+    - 6자리 숫자: 일반 주식 (005930)
+    - 6자리 영숫자 + 영문 1자: ETF (0193T0, 0193W0)
+    """
+    if not ticker:
+        return False
+    if ticker.replace("-", "").isdigit():
+        return True
+    # 6자리이면서 4자리 이상이 숫자면 한국 ETF로 간주
+    if len(ticker) == 6 and sum(c.isdigit() for c in ticker) >= 4:
+        return True
+    return False
+
+
 async def get_stock_price(ticker: str) -> Optional[dict]:
     """ticker로 현재가 조회 - 숫자면 KR, 아니면 US"""
-    if ticker.replace("-", "").isdigit() or (len(ticker) == 6 and ticker.isdigit()):
-        return await get_naver_price(ticker)
+    if _is_kr_ticker(ticker):
+        result = await get_naver_price(ticker)
+        # ETF면 한글 이름 보정
+        if result and ticker in ETF_NAME_KO:
+            result["name"] = ETF_NAME_KO[ticker]
+            result["exchange"] = "ETF"
+        return result
     return await get_yahoo_price(ticker)
 
 
 # ── 검색 ──────────────────────────────────────────────────
 
 async def search_naver(query: str) -> list:
-    """네이버 자동완성 API로 한국 종목 검색"""
+    """네이버 자동완성 API로 한국 종목 검색 (ETF/ETN 포함)"""
     try:
-        url = f"https://ac.stock.naver.com/ac?q={query}&target=index,stock,marketindicator"
+        url = f"https://ac.stock.naver.com/ac?q={query}&target=stock,index,marketindicator"
         headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"}
         async with httpx.AsyncClient(timeout=8) as client:
             resp = await client.get(url, headers=headers)
             data = resp.json()
 
-        # stock 타입만 필터 (index 제외)
-        items = [i for i in data.get("items", []) if i.get("typeCode") in ("KOSPI", "KOSDAQ")]
-        return items[:6]
+        # category=stock 인 것만 (index/marketindicator 제외)
+        # KOSPI/KOSDAQ 일반주식 + ETF(코드에 영문 포함) 모두 포함
+        items = [i for i in data.get("items", []) if i.get("category") == "stock"]
+        return items[:8]
     except Exception as e:
         print(f"네이버 검색 오류: {e}")
         return []
