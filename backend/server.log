@@ -742,3 +742,11 @@ INFO:     Finished server process [47926]
 INFO:     Started server process [48635]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/auth.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48635]
+INFO:     Started server process [51134]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

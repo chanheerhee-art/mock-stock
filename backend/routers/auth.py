@@ -22,6 +22,7 @@ def kakao_login_url():
         f"&redirect_uri={KAKAO_REDIRECT_URI}"
         f"&response_type=code"
         f"&scope=talk_message"
+        f"&prompt=consent"  # 항상 동의 화면 표시 → talk_message 권한 추가 동의 가능
     )
     return {"url": url}
 
