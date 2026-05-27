@@ -392,12 +392,16 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-white">{h.eval_amount.toLocaleString()}원</div>
-                    <div className={`text-xs font-semibold mt-0.5 ${h.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                    <div className="text-sm font-bold text-white">
+                      {h.is_us
+                        ? `$${h.current_price.toFixed(2)}`
+                        : `${h.current_price_krw.toLocaleString()}원`}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {h.profit >= 0 ? "+" : ""}{h.profit.toLocaleString()}원
+                    </div>
+                    <div className={`text-xs font-semibold ${h.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
                       {h.profit >= 0 ? "▲ +" : "▼ "}{h.profit_pct.toFixed(2)}%
-                      <span className="text-gray-500 ml-1 font-normal">
-                        ({h.profit >= 0 ? "+" : ""}{h.profit.toLocaleString()}원)
-                      </span>
                     </div>
                   </div>
                 </div>
