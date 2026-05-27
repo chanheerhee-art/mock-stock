@@ -184,6 +184,16 @@ class AssetSnapshot(Base):
     recorded_at = Column(DateTime, default=datetime.utcnow)
 
 
+class UserBadge(Base):
+    """유저가 획득한 업적/배지"""
+    __tablename__ = "user_badges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    badge_id = Column(String)           # 업적 고유 ID (e.g. "first_trade")
+    earned_at = Column(DateTime, default=datetime.utcnow)
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -193,6 +203,7 @@ async def init_db():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP",
+            # user_badges 테이블은 create_all로 자동 생성됨
         ]
         for sql in migrations:
             try:

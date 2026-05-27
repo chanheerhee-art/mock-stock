@@ -188,6 +188,15 @@ export default function Dashboard() {
   const [showReport, setShowReport] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
 
+  // 업적/배지
+  interface BadgeItem {
+    id: string; icon: string; name: string; desc: string; category: string;
+    earned: boolean; earned_at: string | null;
+  }
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
+  const [badgesLoaded, setBadgesLoaded] = useState(false);
+  const [showBadges, setShowBadges] = useState(false);
+
   const fetchReport = useCallback(async () => {
     if (reportLoading) return;
     setReportLoading(true);
@@ -197,6 +206,17 @@ export default function Dashboard() {
     } catch {}
     setReportLoading(false);
   }, [reportLoading]);
+
+  const fetchBadges = useCallback(async () => {
+    if (badgesLoaded) return;
+    try {
+      // 먼저 자동 체크 후 목록 조회
+      await api.post("/badges/check").catch(() => {});
+      const res = await api.get("/badges/my");
+      setBadges(res.data.badges ?? []);
+      setBadgesLoaded(true);
+    } catch {}
+  }, [badgesLoaded]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -540,6 +560,77 @@ export default function Dashboard() {
                 {report.realized_pnl.length === 0 && report.trade_stats.sell_count === 0 && (
                   <div className="text-center text-gray-500 text-xs py-3">매도 거래가 없어서 실현 손익이 없어요</div>
                 )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      {/* 🏅 업적/배지 */}
+      <div className="bg-gray-900 rounded-2xl overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3"
+          onClick={() => {
+            setShowBadges(v => !v);
+            if (!badgesLoaded) fetchBadges();
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-white">🏅 업적 &amp; 배지</span>
+            {badges.length > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-yellow-400/20 text-yellow-400 font-bold">
+                {badges.filter(b => b.earned).length}/{badges.length}
+              </span>
+            )}
+          </div>
+          <span className="text-gray-500 text-xs">{showBadges ? "▲ 접기" : "▼ 펼치기"}</span>
+        </button>
+
+        {showBadges && (
+          <div className="px-4 pb-4 border-t border-gray-800 pt-3">
+            {!badgesLoaded ? (
+              <div className="text-center text-gray-500 text-xs py-4 animate-pulse">불러오는 중...</div>
+            ) : (
+              <>
+                {/* 획득한 배지만 먼저 */}
+                {(() => {
+                  const earned = badges.filter(b => b.earned);
+                  const notEarned = badges.filter(b => !b.earned);
+                  return (
+                    <>
+                      {earned.length > 0 && (
+                        <div className="mb-4">
+                          <div className="text-xs text-yellow-400 font-semibold mb-2">획득한 배지 {earned.length}개</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {earned.map(b => (
+                              <div key={b.id} className="rounded-xl p-2.5 text-center border border-yellow-400/30" style={{ background: "rgba(250,204,21,0.08)" }}>
+                                <div className="text-2xl mb-1">{b.icon}</div>
+                                <div className="text-xs font-bold text-white leading-tight">{b.name}</div>
+                                <div className="text-xs text-gray-500 mt-0.5 leading-tight line-clamp-2">{b.desc}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {notEarned.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-600 font-semibold mb-2">미획득 {notEarned.length}개</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {notEarned.map(b => (
+                              <div key={b.id} className="rounded-xl p-2.5 text-center border border-gray-800 opacity-40">
+                                <div className="text-2xl mb-1 grayscale">{b.icon}</div>
+                                <div className="text-xs font-bold text-gray-500 leading-tight">{b.name}</div>
+                                <div className="text-xs text-gray-600 mt-0.5 leading-tight line-clamp-2">{b.desc}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {earned.length === 0 && notEarned.length === 0 && (
+                        <div className="text-center text-gray-500 text-xs py-4">배지 정보를 불러올 수 없어요</div>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             )}
           </div>

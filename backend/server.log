@@ -833,3 +833,302 @@ INFO:     Finished server process [55747]
 INFO:     Started server process [55762]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/portfolio.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [55762]
+INFO:     Started server process [60346]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/portfolio.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [60346]
+INFO:     Started server process [61681]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/portfolio.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [61681]
+INFO:     Started server process [62711]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/portfolio.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [62711]
+INFO:     Started server process [62732]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [62732]
+INFO:     Started server process [9102]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [9102]
+INFO:     Started server process [10260]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10260]
+INFO:     Started server process [10335]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10335]
+INFO:     Started server process [10377]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10377]
+INFO:     Started server process [10436]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'models/database.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10436]
+INFO:     Started server process [11139]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/futures.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [11139]
+INFO:     Started server process [16808]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/futures.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16808]
+INFO:     Started server process [17018]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17018]
+INFO:     Started server process [17154]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17154]
+INFO:     Started server process [17167]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/portfolio.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17167]
+INFO:     Started server process [17242]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/portfolio.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17242]
+INFO:     Started server process [17318]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/portfolio.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17318]
+INFO:     Started server process [17338]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17338]
+INFO:     Started server process [25238]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25238]
+INFO:     Started server process [25328]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25328]
+INFO:     Started server process [25404]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25404]
+INFO:     Started server process [25582]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+스케줄러 시작됨!
+[OrderEngine] 시작 — 30초마다 미체결 주문 체크
+INFO:     127.0.0.1:56765 - "GET /stock/search?query=NASA HTTP/1.1" 422 Unprocessable Entity
+KR 주가 조회 오류 (NASA): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/NASA/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+INFO:     127.0.0.1:56770 - "GET /stock/search?q=NASA HTTP/1.1" 200 OK
+KR 주가 조회 오류 (SAAQ): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/SAAQ/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+KR 주가 조회 오류 (4487): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/4487/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+KR 주가 조회 오류 (SAAQU): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/SAAQU/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+KR 주가 조회 오류 (4838): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/4838/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+KR 주가 조회 오류 (9622): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/9622/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+INFO:     127.0.0.1:56777 - "GET /stock/search?q=space HTTP/1.1" 200 OK
+KR 주가 조회 오류 (NASA): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/NASA/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+INFO:     127.0.0.1:56800 - "GET /stock/search?q=NASA HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'services/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25582]
+INFO:     Started server process [30074]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[Migration] 스킵: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+스케줄러 시작됨!
+[OrderEngine] 시작 — 30초마다 미체결 주문 체크
+KR 주가 조회 오류 (NASA): Client error '409 409' for url 'https://m.stock.naver.com/api/stock/NASA/basic'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/409
+INFO:     127.0.0.1:56835 - "GET /stock/search?q=NASA HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'routers/ranking.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [30074]
+INFO:     Started server process [43352]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/ranking.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [43352]
+INFO:     Started server process [43483]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/ai_summary.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [43483]
+INFO:     Started server process [55368]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/stock.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [55368]
+INFO:     Started server process [55453]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'models/database.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [55453]
+INFO:     Started server process [56103]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'services/badges.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [56103]
+INFO:     Started server process [56353]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'routers/badges.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [56353]
+INFO:     Started server process [56471]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [56471]
+INFO:     Started server process [56527]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [56527]
+INFO:     Started server process [56562]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'models/database.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [56562]
+INFO:     Started server process [56601]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

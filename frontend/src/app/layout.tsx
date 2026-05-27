@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import BottomNav from "@/components/BottomNav";
 
 export const metadata: Metadata = {
   title: "모의주식",
@@ -45,7 +46,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="모의주식" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body className="bg-gray-950 text-white min-h-screen">{children}</body>
+      <body className="bg-gray-950 text-white min-h-screen">
+        {children}
+        <BottomNav />
+      </body>
     </html>
   );
 }

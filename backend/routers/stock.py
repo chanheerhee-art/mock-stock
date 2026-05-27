@@ -254,6 +254,19 @@ async def stock_news(ticker: str):
     return {"ticker": ticker, "news": news_list}
 
 
+@router.get("/ai-summary/{ticker}")
+async def ai_news_summary(ticker: str):
+    """Claude AI로 종목 뉴스 요약"""
+    from services.ai_summary import summarize_news
+    from services.stock import _is_kr_ticker
+    is_kr = _is_kr_ticker(ticker)
+    # 종목명 조회
+    price_info = await get_stock_price(ticker)
+    name = price_info["name"] if price_info else ticker
+    summary = await summarize_news(ticker, name, is_kr)
+    return {"ticker": ticker, "summary": summary}
+
+
 @router.get("/dividends/{ticker}")
 async def dividends(ticker: str):
     """배당 정보 — Yahoo Finance dividends 데이터"""
