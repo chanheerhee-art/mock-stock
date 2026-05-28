@@ -203,7 +203,9 @@ async def init_db():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP",
-            # user_badges 테이블은 create_all로 자동 생성됨
+            # PostgreSQL enum 타입에 값 추가 (이미 있으면 무시됨)
+            "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_OPEN'",
+            "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_CLOSE'",
         ]
         for sql in migrations:
             try:
