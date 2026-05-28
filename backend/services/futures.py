@@ -9,11 +9,11 @@ CONTRACT_MULTIPLIER = 50_000
 MARGIN_RATE = 0.10  # 10% 증거금 (10배 레버리지)
 
 _index_cache: dict = {"value": None, "expire": 0.0}
-_CACHE_TTL = 60  # 60초
+_CACHE_TTL = 15  # 15초
 
 
 async def get_kospi200_index() -> Optional[dict]:
-    """KOSPI200 지수 현재가 (1분 캐시)"""
+    """KOSPI200 지수 현재가 (15초 캐시)"""
     now = time.monotonic()
     if _index_cache["value"] and _index_cache["expire"] > now:
         return _index_cache["value"]

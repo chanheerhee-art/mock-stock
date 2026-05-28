@@ -677,7 +677,7 @@ export default function TradePage() {
     if (mainTab !== "FUTURES") return;
     fetchFuturesIndex();
     fetchFuturesPositions();
-    const id = setInterval(() => { fetchFuturesIndex(); fetchFuturesPositions(); }, 30_000);
+    const id = setInterval(() => { fetchFuturesIndex(); fetchFuturesPositions(); }, 15_000);
     return () => clearInterval(id);
   }, [mainTab, fetchFuturesIndex, fetchFuturesPositions]);
 
