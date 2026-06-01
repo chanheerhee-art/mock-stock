@@ -2,20 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from models.database import get_db, User, Portfolio, ShortPosition, SEED_MONEY
+from models.database import get_db, User, Portfolio, ShortPosition, FuturesPosition, SEED_MONEY
 from services.stock import get_stock_price
 from services.exchange_rate import get_usd_krw
+from services.futures import get_kospi200_index, unrealized_pnl as futures_pnl
 
 router = APIRouter(prefix="/ranking", tags=["ranking"])
 
 
 @router.get("/")
 async def get_ranking(db: AsyncSession = Depends(get_db)):
-    """전체 유저 수익률 랭킹 — 평가자산(현금 + 주식 평가액 + 공매도 손익) 기준"""
+    """전체 유저 수익률 랭킹 — 평가자산(현금 + 주식 + 공매도 손익 + 선물 증거금/손익) 기준"""
     result = await db.execute(select(User))
     users = result.scalars().all()
 
     usd_krw = await get_usd_krw()
+    idx = await get_kospi200_index()
+    cur_idx = idx["price"] if idx else None
 
     ranking = []
     for user in users:
@@ -47,7 +50,18 @@ async def get_ranking(db: AsyncSession = Depends(get_db)):
             cur_price_krw = price_info["price"] * usd_krw if price_info["market"] == "US" else price_info["price"]
             short_unrealized += (sp.entry_price - cur_price_krw) * sp.quantity
 
-        total_assets = user.cash + total_eval_krw + short_unrealized
+        # 선물 미실현 손익 + 증거금 (증거금은 진입 시 cash에서 차감됨)
+        fut_result = await db.execute(
+            select(FuturesPosition).where(FuturesPosition.user_id == user.id, FuturesPosition.is_open == True)
+        )
+        futures_unrealized = 0.0
+        futures_margin = 0.0
+        for fp in fut_result.scalars().all():
+            futures_margin += fp.margin
+            if cur_idx is not None:
+                futures_unrealized += futures_pnl(fp.side.value, fp.entry_price, cur_idx, fp.contracts)
+
+        total_assets = user.cash + total_eval_krw + short_unrealized + futures_margin + futures_unrealized
         profit = total_assets - SEED_MONEY
         profit_pct = (profit / SEED_MONEY) * 100
 
@@ -124,7 +138,20 @@ async def get_user_portfolio(user_id: int, db: AsyncSession = Depends(get_db)):
         cur_price_krw = price_info["price"] * usd_krw if price_info["market"] == "US" else price_info["price"]
         short_unrealized += (sp.entry_price - cur_price_krw) * sp.quantity
 
-    total_assets = user.cash + total_eval_krw + short_unrealized
+    # 선물 미실현 손익 + 증거금
+    idx = await get_kospi200_index()
+    cur_idx = idx["price"] if idx else None
+    fut_result = await db.execute(
+        select(FuturesPosition).where(FuturesPosition.user_id == user.id, FuturesPosition.is_open == True)
+    )
+    futures_unrealized = 0.0
+    futures_margin = 0.0
+    for fp in fut_result.scalars().all():
+        futures_margin += fp.margin
+        if cur_idx is not None:
+            futures_unrealized += futures_pnl(fp.side.value, fp.entry_price, cur_idx, fp.contracts)
+
+    total_assets = user.cash + total_eval_krw + short_unrealized + futures_margin + futures_unrealized
     profit = total_assets - SEED_MONEY
     profit_pct = (profit / SEED_MONEY) * 100
 
