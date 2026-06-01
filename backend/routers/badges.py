@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from models.database import get_db, User, UserBadge, TradeHistory, Portfolio, ShortPosition, FuturesPosition, SEED_MONEY
+from models.database import get_db, User, UserBadge, TradeHistory, Portfolio, ShortPosition, FuturesPosition, SeasonResult, SEED_MONEY
 from services.badges import BADGES, BADGE_MAP, check_and_award_badges
 from services.auth import decode_jwt
 from services.exchange_rate import get_usd_krw
@@ -87,11 +87,45 @@ async def check_badges(user: User = Depends(get_current_user), db: AsyncSession 
     fut_res = await db.execute(select(FuturesPosition).where(FuturesPosition.user_id == user.id))
     has_futures = fut_res.scalars().first() is not None
 
+    # 랭킹: 현재 실시간 순위 + 과거 시즌 최고 순위 중 더 좋은(낮은) 값
+    best_rank = None
+
+    # 과거 시즌 결과 중 최고 순위
+    past_res = await db.execute(
+        select(func.min(SeasonResult.rank)).where(SeasonResult.user_id == user.id)
+    )
+    past_best = past_res.scalar()
+    if past_best is not None:
+        best_rank = past_best
+
+    # 현재 실시간 순위 (내 수익률보다 높은 유저 수 + 1)
+    users_res = await db.execute(select(User))
+    all_users = users_res.scalars().all()
+    if len(all_users) > 1:
+        higher = 0
+        for u in all_users:
+            if u.id == user.id:
+                continue
+            u_eval = 0.0
+            u_port = await db.execute(select(Portfolio).where(Portfolio.user_id == u.id))
+            for p in u_port.scalars().all():
+                pinfo = await get_stock_price(p.ticker)
+                if pinfo:
+                    pk = pinfo["price"] * usd_krw if pinfo["market"] == "US" else pinfo["price"]
+                    u_eval += pk * p.quantity
+            u_pct = ((u.cash + u_eval - SEED_MONEY) / SEED_MONEY) * 100
+            if u_pct > profit_pct:
+                higher += 1
+        current_rank = higher + 1
+        if best_rank is None or current_rank < best_rank:
+            best_rank = current_rank
+
     new_badges = await check_and_award_badges(
         user.id, db,
         trade_count=trade_count,
         profit_pct=profit_pct,
         holdings=holdings,
+        rank=best_rank,
         has_short=has_short,
         has_futures=has_futures,
     )
