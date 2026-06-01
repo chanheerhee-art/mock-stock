@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
+import os
 import pytz
 
 from models.database import init_db
@@ -78,7 +79,18 @@ def root():
     return {"message": "모의주식 API 서버 🚀"}
 
 
-@app.post("/admin/fix-cash")
+ADMIN_KEY = os.getenv("ADMIN_KEY")
+
+
+def verify_admin(x_admin_key: str = Header(None)):
+    """admin 엔드포인트 보호. ADMIN_KEY 환경변수와 X-Admin-Key 헤더 일치 필요."""
+    if not ADMIN_KEY:
+        raise HTTPException(status_code=503, detail="ADMIN_KEY가 설정되지 않았습니다")
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="권한이 없습니다")
+
+
+@app.post("/admin/fix-cash", dependencies=[Depends(verify_admin)])
 async def fix_negative_cash():
     """현금 복구 + 미청산 포지션 정리 + 중복 활성 시즌 정리"""
     from models.database import AsyncSessionLocal, User, ShortPosition, FuturesPosition, Season, SEED_MONEY
@@ -117,7 +129,7 @@ async def fix_negative_cash():
     }
 
 
-@app.post("/admin/reset-all")
+@app.post("/admin/reset-all", dependencies=[Depends(verify_admin)])
 async def reset_all_accounts():
     """공매도 회계 버그로 꼬인 데이터 정리: 전 유저를 시드머니로 리셋하고
     모든 보유종목/공매도/선물 포지션을 초기화한다."""
