@@ -18,9 +18,13 @@ export default function Home() {
 
   const handleKakaoLogin = () => {
     // 직접 카카오 로그인 URL로 이동 (API 호출 없이)
-    const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
-    const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
-    const url = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${redirectUri}&response_type=code`;
+    // NEXT_PUBLIC_ 환경변수가 빌드에 안 박히는 경우가 있어 공개값을 기본값으로 사용
+    const kakaoClientId =
+      process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID || "1e03d1a3bf55c7fd95c60c814f38fb9e";
+    const redirectUri =
+      process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI ||
+      "https://mock-stock-app.vercel.app/auth/callback";
+    const url = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
     window.location.href = url;
   };
 
