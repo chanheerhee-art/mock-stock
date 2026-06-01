@@ -11,7 +11,7 @@ from services.futures import get_kospi200_index, unrealized_pnl as futures_pnl
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 
-async def get_current_user(authorization: str = Header(...), db: AsyncSession = Depends(get_db)) -> User:
+async def get_current_user(authorization: str = Header(None), db: AsyncSession = Depends(get_db)) -> User:
     try:
         token = authorization.replace("Bearer ", "")
         payload = decode_jwt(token)

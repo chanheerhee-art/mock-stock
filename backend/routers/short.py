@@ -16,7 +16,7 @@ router = APIRouter(prefix="/short", tags=["short"])
 MARGIN_RATE = 0.30
 
 
-async def get_current_user(authorization: str = Header(...), db: AsyncSession = Depends(get_db)) -> User:
+async def get_current_user(authorization: str = Header(None), db: AsyncSession = Depends(get_db)) -> User:
     try:
         token = authorization.replace("Bearer ", "")
         payload = decode_jwt(token)
