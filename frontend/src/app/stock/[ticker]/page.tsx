@@ -173,10 +173,6 @@ export default function StockDetailPage() {
   const [showNews, setShowNews] = useState(false);
   const [newsLoading, setNewsLoading] = useState(false);
 
-  // AI 요약
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-
   // 종목 상세 지표
   interface StockDetails {
     volume: number | null; avg_volume: number | null;
@@ -242,16 +238,6 @@ export default function StockDetailPage() {
     } catch {}
     setNewsLoading(false);
   }, [ticker]);
-
-  const fetchAiSummary = useCallback(async () => {
-    if (aiSummary) return; // 이미 로드됨
-    setAiLoading(true);
-    try {
-      const res = await api.get(`/stock/ai-summary/${ticker}`);
-      setAiSummary(res.data.summary ?? null);
-    } catch {}
-    setAiLoading(false);
-  }, [ticker, aiSummary]);
 
   const fetchDetails = useCallback(async () => {
     try {
@@ -901,56 +887,6 @@ export default function StockDetailPage() {
               {dividendInfo.dividends.length === 0 && dividendInfo.splits.length === 0 && !dividendInfo.dividend_yield && (
                 <div className="text-xs text-gray-500 text-center py-2">배당 정보가 없습니다</div>
               )}
-            </div>
-          )}
-        </div>
-
-        {/* 🤖 AI 뉴스 요약 */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: "#1a1a2e", border: "1px solid #2d2d5e" }}>
-          <button
-            className="w-full flex items-center justify-between px-4 py-3"
-            onClick={() => { if (!aiSummary && !aiLoading) fetchAiSummary(); }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white">🤖 AI 뉴스 요약</span>
-              <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(139,92,246,0.2)", color: "#a78bfa" }}>Claude</span>
-            </div>
-            {aiLoading ? (
-              <span className="text-xs text-purple-400 animate-pulse">분석 중...</span>
-            ) : aiSummary ? (
-              <span className="text-xs text-gray-500">완료</span>
-            ) : (
-              <span className="text-xs text-purple-400">탭하여 요약</span>
-            )}
-          </button>
-          {aiLoading && (
-            <div className="px-4 pb-4 pt-1 border-t border-indigo-900/50">
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="h-3 rounded-full bg-indigo-900/50 animate-pulse" style={{ width: `${100 - i * 15}%` }} />
-                ))}
-              </div>
-            </div>
-          )}
-          {!aiLoading && aiSummary && (
-            <div className="px-4 pb-4 pt-1 border-t border-indigo-900/50">
-              <p className="text-sm text-gray-300 leading-relaxed">{aiSummary}</p>
-              <button
-                onClick={() => { setAiSummary(null); fetchAiSummary(); }}
-                className="mt-2 text-xs text-purple-400 hover:text-purple-300 transition-colors"
-              >
-                🔄 다시 요약
-              </button>
-            </div>
-          )}
-          {!aiLoading && !aiSummary && (
-            <div className="px-4 pb-3 border-t border-indigo-900/50">
-              <button
-                onClick={fetchAiSummary}
-                className="w-full text-xs text-purple-400 py-2 hover:text-purple-300 transition-colors"
-              >
-                📰 최신 뉴스 AI 분석 시작
-              </button>
             </div>
           )}
         </div>
