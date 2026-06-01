@@ -201,16 +201,20 @@ async def init_db():
 
     if is_postgres:
         # ALTER TYPE ADD VALUE는 autocommit 모드에서만 실행 가능
-        autocommit_engine = engine.execution_options(isolation_level="AUTOCOMMIT")
-        async with autocommit_engine.connect() as conn:
-            for sql in [
-                "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_OPEN'",
-                "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_CLOSE'",
-            ]:
-                try:
-                    await conn.execute(text(sql))
-                except Exception as e:
-                    print(f"[Migration] enum 스킵: {e}")
+        # 실패해도 서버 기동은 막지 않도록 전체를 try로 감쌈
+        try:
+            autocommit_engine = engine.execution_options(isolation_level="AUTOCOMMIT")
+            async with autocommit_engine.connect() as conn:
+                for sql in [
+                    "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_OPEN'",
+                    "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_CLOSE'",
+                ]:
+                    try:
+                        await conn.execute(text(sql))
+                    except Exception as e:
+                        print(f"[Migration] enum 스킵: {e}")
+        except Exception as e:
+            print(f"[Migration] enum 블록 전체 스킵: {e}")
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
