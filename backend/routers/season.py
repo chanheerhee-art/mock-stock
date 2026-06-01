@@ -152,9 +152,11 @@ async def reset_season(db: AsyncSession = Depends(get_db)):
         user.cash = SEED_MONEY
 
     # 모든 포트폴리오 초기화
-    from models.database import Portfolio
+    from models.database import Portfolio, ShortPosition, FuturesPosition
     from sqlalchemy import delete
     await db.execute(delete(Portfolio))
+    await db.execute(delete(ShortPosition))
+    await db.execute(delete(FuturesPosition))
 
     await db.commit()
     return {"message": f"시즌 {current_season.season_number} 종료! 시즌 {current_season.season_number + 1} 시작!"}

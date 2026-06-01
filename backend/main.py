@@ -76,3 +76,28 @@ app.include_router(badges.router)
 @app.get("/")
 def root():
     return {"message": "모의주식 API 서버 🚀"}
+
+
+@app.post("/admin/fix-cash")
+async def fix_negative_cash():
+    """현금이 마이너스인 유저를 시드머니로 복구 + 미청산 공매도/선물 포지션 정리"""
+    from models.database import AsyncSessionLocal, User, ShortPosition, FuturesPosition, SEED_MONEY
+    from sqlalchemy import select, delete
+
+    async with AsyncSessionLocal() as db:
+        # 마이너스 현금 유저 복구
+        result = await db.execute(select(User).where(User.cash < 0))
+        users = result.scalars().all()
+        fixed = []
+        for user in users:
+            old_cash = user.cash
+            user.cash = SEED_MONEY
+            fixed.append({"user_id": user.id, "nickname": user.nickname, "old_cash": old_cash})
+
+        # 미청산 공매도/선물 포지션 전체 삭제
+        await db.execute(delete(ShortPosition).where(ShortPosition.is_open == True))
+        await db.execute(delete(FuturesPosition).where(FuturesPosition.is_open == True))
+
+        await db.commit()
+
+    return {"fixed_users": fixed, "message": "완료"}
