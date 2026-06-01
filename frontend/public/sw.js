@@ -1,10 +1,6 @@
-const CACHE_NAME = "mock-stock-v1";
+const CACHE_NAME = "mock-stock-v2";
+// 아이콘 등 잘 안 바뀌는 자산만 미리 캐싱 (HTML 페이지는 캐싱하지 않음 — 항상 최신 받기)
 const STATIC_ASSETS = [
-  "/",
-  "/dashboard",
-  "/trade",
-  "/ranking",
-  "/portfolio",
   "/icon-192.png",
   "/icon-512.png",
 ];
@@ -27,25 +23,43 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// fetch: network-first (API), cache-first (static)
+// fetch 전략
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // GET 외(POST 등)는 그냥 통과
+  if (request.method !== "GET") return;
+
   // API 요청은 네트워크 우선, 실패 시 캐시
   if (url.hostname.includes("railway.app") || url.pathname.startsWith("/api")) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)));
+    return;
+  }
+
+  // HTML 문서(페이지 내비게이션)는 항상 네트워크 우선 → 새 배포 즉시 반영
+  // (오프라인일 때만 캐시 폴백)
+  if (request.mode === "navigate" || request.destination === "document") {
     event.respondWith(
-      fetch(request).catch(() => caches.match(request))
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
 
-  // 정적 자산은 캐시 우선
+  // 해시가 박힌 정적 자산(_next/static 등)은 캐시 우선 (불변)
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
-        if (response.ok && request.method === "GET") {
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }

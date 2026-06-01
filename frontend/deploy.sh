@@ -5,9 +5,14 @@ set -e
 
 ALIAS_DOMAIN="mock-stock-app.vercel.app"
 
-echo "🚀 프로덕션 배포 중..."
-# --yes: 프롬프트 스킵. 출력 전체에서 배포 URL을 추출
-OUTPUT=$(npx vercel deploy --prod --yes 2>&1)
+echo "🧹 이전 빌드 캐시 정리..."
+rm -rf .vercel/output
+
+echo "🔨 빌드 중..."
+npx vercel build --prod --yes >/tmp/vercel_build.log 2>&1 || { echo "❌ 빌드 실패"; tail -15 /tmp/vercel_build.log; exit 1; }
+
+echo "🚀 프로덕션 배포 중 (prebuilt)..."
+OUTPUT=$(npx vercel deploy --prebuilt --prod --yes 2>&1)
 DEPLOY_URL=$(echo "$OUTPUT" | grep -oE 'https://mock-stock-[a-z0-9]+-chanheerhee-arts-projects\.vercel\.app' | head -1)
 
 if [[ -z "$DEPLOY_URL" ]]; then
