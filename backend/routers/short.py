@@ -69,9 +69,8 @@ async def open_short(req: ShortRequest, user: User = Depends(get_current_user), 
             detail=f"증거금 부족 (필요: {margin:,.0f}원 = 공매도금액의 30%, 보유: {user.cash:,.0f}원)"
         )
 
-    # 담보금 차감 + 매도 대금 입금
+    # 증거금만 차감 (매도대금은 빌린 주식을 갚아야 하므로 자산에 넣지 않음)
     user.cash -= margin
-    user.cash += total_value
 
     # 숏 포지션 생성
     position = ShortPosition(
@@ -148,11 +147,9 @@ async def close_short(position_id: int, user: User = Depends(get_current_user), 
     buy_back_cost = current_price_krw * position.quantity   # 되사는 비용
     profit = (position.entry_price - current_price_krw) * position.quantity  # 진입가 - 현재가 = 수익
 
-    # 청산: 매도 대금으로 되사고 + 담보금 반환 + 수익/손실
-    # cash 변화 = -buy_back_cost (되사기) + margin (담보 반환)
-    # 이미 진입 시 total_value가 입금됐으므로: 순수익 = total_value - buy_back_cost
-    user.cash -= buy_back_cost
-    user.cash += position.margin  # 담보금 반환
+    # 청산: 증거금 반환 + 손익 정산
+    # 진입 시 매도대금을 cash에 넣지 않았으므로, 여기서는 증거금 + 실현손익만 반영
+    user.cash += position.margin + profit
 
     from datetime import datetime
     position.is_open = False

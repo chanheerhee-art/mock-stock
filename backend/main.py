@@ -115,3 +115,27 @@ async def fix_negative_cash():
         "deactivated_duplicate_seasons": deactivated,
         "message": "완료",
     }
+
+
+@app.post("/admin/reset-all")
+async def reset_all_accounts():
+    """공매도 회계 버그로 꼬인 데이터 정리: 전 유저를 시드머니로 리셋하고
+    모든 보유종목/공매도/선물 포지션을 초기화한다."""
+    from models.database import (
+        AsyncSessionLocal, User, Portfolio, ShortPosition, FuturesPosition, SEED_MONEY,
+    )
+    from sqlalchemy import select, delete
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User))
+        users = result.scalars().all()
+        for user in users:
+            user.cash = SEED_MONEY
+
+        await db.execute(delete(Portfolio))
+        await db.execute(delete(ShortPosition))
+        await db.execute(delete(FuturesPosition))
+
+        await db.commit()
+
+    return {"reset_users": len(users), "message": "전 계정 시드머니로 리셋 완료"}
