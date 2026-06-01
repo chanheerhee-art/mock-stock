@@ -187,6 +187,7 @@ export default function Dashboard() {
   const [report, setReport] = useState<Report | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // 업적/배지
   interface BadgeItem {
@@ -247,6 +248,14 @@ export default function Dashboard() {
     }
   }, [router]);
 
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    await fetchData();
+    // 회전 애니메이션이 너무 짧게 끝나지 않도록 최소 시간 보장
+    setTimeout(() => setRefreshing(false), 500);
+  }, [refreshing, fetchData]);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.replace("/"); return; }
@@ -288,6 +297,12 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-600">💱 {portfolio.usd_krw.toLocaleString()}원</span>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            aria-label="새로고침"
+            className={`text-base text-gray-500 hover:text-white transition-colors disabled:opacity-50 ${refreshing ? "animate-spin" : ""}`}
+          >🔄</button>
           <button
             onClick={() => { localStorage.clear(); router.replace("/"); }}
             className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
