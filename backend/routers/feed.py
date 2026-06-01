@@ -43,7 +43,7 @@ async def get_trade_feed(limit: int = 30, db: AsyncSession = Depends(get_db)):
             "quantity": trade.quantity,
             "price": round(trade.price, 2),
             "total": round(trade.total, 0),
-            "traded_at": trade.traded_at.isoformat(),
+            "traded_at": trade.traded_at.isoformat() + "Z",
         })
 
     return feed
