@@ -1026,7 +1026,7 @@ export default function TradePage() {
               <div className="font-bold text-orange-400 mb-1">📉 공매도란?</div>
               <div>주식을 빌려서 팔고 → 나중에 싸게 사서 갚아 차익 실현</div>
               <div>주가가 <span className="text-blue-400 font-semibold">내릴수록 이익</span>, 올라가면 손실</div>
-              <div className="text-orange-400 font-semibold">⚠️ 증거금 30% 필요 · 손실 이론상 무한대</div>
+              <div className="text-orange-400 font-semibold">⚠️ 증거금 30% 필요 · 손실이 증거금의 80% 도달 시 강제청산</div>
             </div>
 
             {shortPositions.length > 0 && (
@@ -1114,7 +1114,7 @@ export default function TradePage() {
               <div className="font-bold text-purple-300 mb-1">⚡ 코스피200 선물</div>
               <div>지수 1포인트당 <span className="text-purple-300 font-semibold">50,000원</span> × 계약수</div>
               <div>증거금 10% (10배 레버리지) · <span className="text-red-400 font-semibold">롱 매수 / 숏 매도</span></div>
-              <div className="text-purple-300 font-semibold">⚠️ 손실은 증거금 한도까지 (강제 청산)</div>
+              <div className="text-purple-300 font-semibold">⚠️ 손실이 증거금의 80% 도달 시 강제청산</div>
             </div>
 
             {futuresIndex && (

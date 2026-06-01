@@ -161,11 +161,18 @@ async def check_and_fill_orders():
 
 
 async def order_engine_loop():
-    """30초마다 주문 체결 엔진 실행"""
-    print("[OrderEngine] 시작 — 30초마다 미체결 주문 체크")
+    """30초마다 주문 체결 엔진 + 마진콜 체크 실행"""
+    print("[OrderEngine] 시작 — 30초마다 미체결 주문 + 마진콜 체크")
+    from services.margin_call import check_margin_calls
     while True:
         try:
             await check_and_fill_orders()
         except Exception as e:
-            print(f"[OrderEngine] 루프 오류: {e}")
+            print(f"[OrderEngine] 주문 체결 오류: {e}")
+        try:
+            liquidated = await check_margin_calls()
+            if liquidated:
+                print(f"[MarginCall] 강제청산 {len(liquidated)}건: {liquidated}")
+        except Exception as e:
+            print(f"[MarginCall] 마진콜 체크 오류: {e}")
         await asyncio.sleep(30)
