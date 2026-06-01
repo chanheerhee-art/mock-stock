@@ -27,7 +27,8 @@ async def kakao_get_token(code: str) -> dict:
                 "code": code,
             },
         )
-        resp.raise_for_status()
+        if not resp.is_success:
+            raise Exception(f"카카오 토큰 오류 {resp.status_code}: {resp.text}")
         return resp.json()  # access_token, refresh_token, expires_in 포함
 
 
