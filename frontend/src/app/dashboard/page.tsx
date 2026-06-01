@@ -197,6 +197,15 @@ export default function Dashboard() {
   const [badgesLoaded, setBadgesLoaded] = useState(false);
   const [showBadges, setShowBadges] = useState(false);
 
+  // 친구 거래 피드
+  interface FeedItem {
+    id: number; user_id: number; nickname: string; profile_image?: string;
+    ticker: string; name: string; market: string; trade_type: string;
+    trade_label: string; emoji: string; quantity: number; price: number;
+    total: number; traded_at: string;
+  }
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+
   const fetchReport = useCallback(async () => {
     if (reportLoading) return;
     setReportLoading(true);
@@ -220,14 +229,16 @@ export default function Dashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [portfolioRes, chartRes, shortRes] = await Promise.all([
+      const [portfolioRes, chartRes, shortRes, feedRes] = await Promise.all([
         api.get("/portfolio/me"),
         api.get("/portfolio/history-chart").catch(() => ({ data: [] })),
         api.get("/short/positions").catch(() => ({ data: [] })),
+        api.get("/feed/?limit=20").catch(() => ({ data: [] })),
       ]);
       setPortfolio(portfolioRes.data);
       setChartData(chartRes.data);
       setShortPositions(shortRes.data);
+      setFeed(feedRes.data);
     } catch {
       localStorage.clear();
       router.replace("/");
@@ -633,6 +644,51 @@ export default function Dashboard() {
                 })()}
               </>
             )}
+          </div>
+        )}
+
+        {/* 👀 친구 거래 피드 */}
+        {feed.length > 0 && (
+          <div className="rounded-2xl p-4" style={{ background: "#1a1a1a" }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-white">👀 친구들 거래</span>
+              <span className="text-xs text-gray-500">실시간</span>
+            </div>
+            <div className="space-y-3">
+              {feed.map((f) => {
+                const isBuy = f.trade_type === "BUY" || f.trade_type === "SHORT_CLOSE";
+                const when = (() => {
+                  const diff = Date.now() - new Date(f.traded_at).getTime();
+                  const m = Math.floor(diff / 60000);
+                  if (m < 1) return "방금";
+                  if (m < 60) return `${m}분 전`;
+                  const h = Math.floor(m / 60);
+                  if (h < 24) return `${h}시간 전`;
+                  return `${Math.floor(h / 24)}일 전`;
+                })();
+                return (
+                  <div key={f.id} className="flex items-center gap-2.5">
+                    {f.profile_image ? (
+                      <img src={f.profile_image} className="w-8 h-8 rounded-full border border-gray-700 shrink-0" alt="" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs shrink-0">👤</div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-gray-200 truncate">
+                        <span className="font-semibold text-white">{f.nickname}</span>
+                        <span className="text-gray-400">님이 </span>
+                        <span className="font-semibold text-white">{f.name}</span>
+                        <span className="text-gray-400"> {f.quantity.toLocaleString()}주 </span>
+                        <span className={`font-semibold ${isBuy ? "text-red-400" : "text-blue-400"}`}>
+                          {f.emoji} {f.trade_label}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 mt-0.5">{when}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

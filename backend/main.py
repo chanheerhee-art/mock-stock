@@ -8,7 +8,7 @@ import os
 import pytz
 
 from models.database import init_db
-from routers import auth, trade, portfolio, ranking, stock, season, short, futures, badges
+from routers import auth, trade, portfolio, ranking, stock, season, short, futures, badges, feed
 from routers.snapshot import save_daily_snapshots
 from services.order_engine import order_engine_loop
 
@@ -72,6 +72,7 @@ app.include_router(season.router)
 app.include_router(short.router)
 app.include_router(futures.router)
 app.include_router(badges.router)
+app.include_router(feed.router)
 
 
 @app.get("/")
