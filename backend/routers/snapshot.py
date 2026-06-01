@@ -11,8 +11,10 @@ async def save_daily_snapshots():
     """모든 유저의 오늘 자산 스냅샷 저장"""
     async with AsyncSessionLocal() as db:
         # 현재 시즌
-        season_result = await db.execute(select(Season).where(Season.is_active == True))
-        season = season_result.scalar_one_or_none()
+        season_result = await db.execute(
+            select(Season).where(Season.is_active == True).order_by(Season.season_number.desc()).limit(1)
+        )
+        season = season_result.scalars().first()
         season_num = season.season_number if season else 1
 
         users_result = await db.execute(select(User))

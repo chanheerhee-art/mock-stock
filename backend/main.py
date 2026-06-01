@@ -80,8 +80,8 @@ def root():
 
 @app.post("/admin/fix-cash")
 async def fix_negative_cash():
-    """현금이 마이너스인 유저를 시드머니로 복구 + 미청산 공매도/선물 포지션 정리"""
-    from models.database import AsyncSessionLocal, User, ShortPosition, FuturesPosition, SEED_MONEY
+    """현금 복구 + 미청산 포지션 정리 + 중복 활성 시즌 정리"""
+    from models.database import AsyncSessionLocal, User, ShortPosition, FuturesPosition, Season, SEED_MONEY
     from sqlalchemy import select, delete
 
     async with AsyncSessionLocal() as db:
@@ -98,6 +98,20 @@ async def fix_negative_cash():
         await db.execute(delete(ShortPosition).where(ShortPosition.is_open == True))
         await db.execute(delete(FuturesPosition).where(FuturesPosition.is_open == True))
 
+        # 중복 활성 시즌 정리: 가장 최근 것만 남기고 나머지 비활성화
+        active_result = await db.execute(
+            select(Season).where(Season.is_active == True).order_by(Season.season_number.desc())
+        )
+        active_seasons = active_result.scalars().all()
+        deactivated = 0
+        for s in active_seasons[1:]:
+            s.is_active = False
+            deactivated += 1
+
         await db.commit()
 
-    return {"fixed_users": fixed, "message": "완료"}
+    return {
+        "fixed_users": fixed,
+        "deactivated_duplicate_seasons": deactivated,
+        "message": "완료",
+    }

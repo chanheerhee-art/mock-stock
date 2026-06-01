@@ -230,11 +230,11 @@ async def init_db():
             except Exception as e:
                 print(f"[Migration] 스킵: {e}")
 
-    # 첫 시즌 자동 생성
+    # 첫 시즌 자동 생성 (시즌이 하나도 없을 때만)
     async with AsyncSessionLocal() as session:
         from sqlalchemy import select
-        result = await session.execute(select(Season))
-        if not result.scalar_one_or_none():
+        result = await session.execute(select(Season).limit(1))
+        if result.first() is None:
             now = datetime.utcnow()
             session.add(Season(season_number=1, year=now.year, month=now.month, is_active=True))
             await session.commit()

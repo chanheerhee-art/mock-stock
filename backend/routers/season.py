@@ -23,8 +23,10 @@ async def calc_user_assets(user: User, db: AsyncSession) -> float:
 @router.get("/current")
 async def get_current_season(db: AsyncSession = Depends(get_db)):
     """현재 시즌 정보"""
-    result = await db.execute(select(Season).where(Season.is_active == True))
-    season = result.scalar_one_or_none()
+    result = await db.execute(
+        select(Season).where(Season.is_active == True).order_by(Season.season_number.desc()).limit(1)
+    )
+    season = result.scalars().first()
     if not season:
         return {"season": None}
     now = datetime.utcnow()
@@ -101,9 +103,11 @@ async def get_asset_snapshot(user_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/reset")
 async def reset_season(db: AsyncSession = Depends(get_db)):
     """시즌 초기화 (매월 1일 자동 호출 or 수동)"""
-    # 현재 시즌 종료
-    result = await db.execute(select(Season).where(Season.is_active == True))
-    current_season = result.scalar_one_or_none()
+    # 현재 시즌 종료 (활성 시즌이 여러 개면 가장 최근 것)
+    result = await db.execute(
+        select(Season).where(Season.is_active == True).order_by(Season.season_number.desc()).limit(1)
+    )
+    current_season = result.scalars().first()
     if not current_season:
         return {"message": "활성 시즌 없음"}
 
