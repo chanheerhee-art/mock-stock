@@ -195,21 +195,30 @@ class UserBadge(Base):
 
 
 async def init_db():
+    from sqlalchemy import text
+
+    # ALTER TYPE ADD VALUE는 트랜잭션 밖에서 실행해야 함
+    async with engine.connect() as conn:
+        await conn.execution_options(isolation_level="AUTOCOMMIT")
+        for sql in [
+            "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_OPEN'",
+            "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_CLOSE'",
+        ]:
+            try:
+                await conn.execute(text(sql))
+            except Exception as e:
+                print(f"[Migration] enum 스킵: {e}")
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
         # 컬럼 마이그레이션 (없으면 추가, 있으면 무시)
-        migrations = [
+        for sql in [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP",
-            # PostgreSQL enum 타입에 값 추가 (이미 있으면 무시됨)
-            "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_OPEN'",
-            "ALTER TYPE tradetype ADD VALUE IF NOT EXISTS 'SHORT_CLOSE'",
-        ]
-        for sql in migrations:
+        ]:
             try:
-                from sqlalchemy import text
                 await conn.execute(text(sql))
             except Exception as e:
                 print(f"[Migration] 스킵: {e}")
