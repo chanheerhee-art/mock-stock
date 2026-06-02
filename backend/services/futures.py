@@ -21,8 +21,8 @@ FUTURES_SPECS: dict[str, dict] = {
         "flag": "🇰🇷",
     },
     "KOSDAQ150": {
-        "yahoo_symbol": "%5EKOSDAQ",
-        "name_kr": "코스닥150",
+        "yahoo_symbol": "%5EKQ11",
+        "name_kr": "코스닥",
         "multiplier": 10_000,
         "margin_rate": 0.10,
         "unit": "pt",
