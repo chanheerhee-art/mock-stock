@@ -5,7 +5,7 @@ from sqlalchemy import select
 from models.database import get_db, User, Portfolio, ShortPosition, FuturesPosition, SEED_MONEY
 from services.stock import get_stock_price
 from services.exchange_rate import get_usd_krw
-from services.futures import get_kospi200_index, unrealized_pnl as futures_pnl
+from services.futures import get_futures_price, unrealized_pnl as futures_pnl
 
 router = APIRouter(prefix="/ranking", tags=["ranking"])
 
@@ -17,8 +17,6 @@ async def get_ranking(db: AsyncSession = Depends(get_db)):
     users = result.scalars().all()
 
     usd_krw = await get_usd_krw()
-    idx = await get_kospi200_index()
-    cur_idx = idx["price"] if idx else None
 
     ranking = []
     for user in users:
@@ -58,8 +56,10 @@ async def get_ranking(db: AsyncSession = Depends(get_db)):
         futures_margin = 0.0
         for fp in fut_result.scalars().all():
             futures_margin += fp.margin
-            if cur_idx is not None:
-                futures_unrealized += futures_pnl(fp.side.value, fp.entry_price, cur_idx, fp.contracts)
+            sym = fp.symbol or "KOSPI200"
+            fp_price = await get_futures_price(sym)
+            if fp_price:
+                futures_unrealized += futures_pnl(fp.side.value, fp.entry_price, fp_price["price"], fp.contracts, sym)
 
         total_assets = user.cash + total_eval_krw + short_unrealized + futures_margin + futures_unrealized
         profit = total_assets - SEED_MONEY
@@ -139,8 +139,6 @@ async def get_user_portfolio(user_id: int, db: AsyncSession = Depends(get_db)):
         short_unrealized += (sp.entry_price - cur_price_krw) * sp.quantity
 
     # 선물 미실현 손익 + 증거금
-    idx = await get_kospi200_index()
-    cur_idx = idx["price"] if idx else None
     fut_result = await db.execute(
         select(FuturesPosition).where(FuturesPosition.user_id == user.id, FuturesPosition.is_open == True)
     )
@@ -148,8 +146,10 @@ async def get_user_portfolio(user_id: int, db: AsyncSession = Depends(get_db)):
     futures_margin = 0.0
     for fp in fut_result.scalars().all():
         futures_margin += fp.margin
-        if cur_idx is not None:
-            futures_unrealized += futures_pnl(fp.side.value, fp.entry_price, cur_idx, fp.contracts)
+        sym = fp.symbol or "KOSPI200"
+        fp_price = await get_futures_price(sym)
+        if fp_price:
+            futures_unrealized += futures_pnl(fp.side.value, fp.entry_price, fp_price["price"], fp.contracts, sym)
 
     total_assets = user.cash + total_eval_krw + short_unrealized + futures_margin + futures_unrealized
     profit = total_assets - SEED_MONEY

@@ -131,14 +131,15 @@ class FuturesSide(str, enum.Enum):
 
 
 class FuturesPosition(Base):
-    """코스피200 선물 포지션 (10배 레버리지)"""
+    """선물 포지션 (10배 레버리지)"""
     __tablename__ = "futures_positions"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    symbol = Column(String, default="KOSPI200")  # 선물 종목 코드
     side = Column(Enum(FuturesSide))   # LONG / SHORT
     contracts = Column(Integer)         # 계약 수
-    entry_price = Column(Float)         # 진입 지수 (KOSPI200)
+    entry_price = Column(Float)         # 진입가
     margin = Column(Float)              # 증거금 (계약가치 × 10%)
     is_open = Column(Boolean, default=True)
     opened_at = Column(DateTime, default=datetime.utcnow)
@@ -224,6 +225,7 @@ async def init_db():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_access_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_refresh_token VARCHAR",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS kakao_token_expires TIMESTAMP",
+            "ALTER TABLE futures_positions ADD COLUMN IF NOT EXISTS symbol VARCHAR DEFAULT 'KOSPI200'",
         ]:
             try:
                 await conn.execute(text(sql))

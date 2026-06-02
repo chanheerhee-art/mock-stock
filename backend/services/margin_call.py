@@ -12,7 +12,7 @@ from models.database import (
 )
 from services.stock import get_stock_price
 from services.exchange_rate import get_usd_krw
-from services.futures import get_kospi200_index, unrealized_pnl as futures_pnl
+from services.futures import get_futures_price, unrealized_pnl as futures_pnl
 
 # 손실이 증거금의 이 비율에 도달하면 강제청산
 LIQUIDATION_RATIO = 0.8
@@ -25,14 +25,14 @@ async def _liquidate_futures(db) -> list[dict]:
     if not positions:
         return []
 
-    idx = await get_kospi200_index()
-    if not idx:
-        return []
-    cur_idx = idx["price"]
-
     liquidated = []
     for p in positions:
-        pnl = futures_pnl(p.side.value, p.entry_price, cur_idx, p.contracts)
+        symbol = p.symbol or "KOSPI200"
+        idx = await get_futures_price(symbol)
+        if not idx:
+            continue
+        cur_idx = idx["price"]
+        pnl = futures_pnl(p.side.value, p.entry_price, cur_idx, p.contracts, symbol)
         # 손실이 증거금의 80% 이상이면 청산
         if pnl < 0 and abs(pnl) >= p.margin * LIQUIDATION_RATIO:
             user_res = await db.execute(select(User).where(User.id == p.user_id))
