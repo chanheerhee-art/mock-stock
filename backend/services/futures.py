@@ -22,7 +22,7 @@ FUTURES_SPECS: dict[str, dict] = {
     },
     "KOSDAQ150": {
         "yahoo_symbol": "%5EKQ11",
-        "name_kr": "코스닥",
+        "name_kr": "코스닥150",
         "multiplier": 10_000,
         "margin_rate": 0.10,
         "unit": "pt",
